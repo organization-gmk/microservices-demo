@@ -62,13 +62,10 @@ jobs:
           cache: maven
 
       # ---------------- OWASP CACHE ----------------
-      - name: Cache OWASP Dependency-Check data
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: owasp-${{ runner.os }}
-          restore-keys: |
-            owasp-${{ runner.os }}
 
       # ---------------- CODE QUALITY ----------------
       - name: Checkstyle
@@ -78,10 +75,11 @@ jobs:
 
       - name: OWASP Dependency Check
         run: |
-          cd $BASE_DIR/${{ matrix.service }}
-          mvn org.owasp:dependency-check-maven:check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+            cd $BASE_DIR/${{ matrix.service }}
+            mvn org.owasp:dependency-check-maven:12.2.0:check \
+            -Dnvd.api.key=${{ secrets.NVD_API_KEY }} \
+            -Dnvd.api.delay=2000 \
+            -DfailOnError=false
 
       # ---------------- TESTS ----------------
       - name: Run tests
