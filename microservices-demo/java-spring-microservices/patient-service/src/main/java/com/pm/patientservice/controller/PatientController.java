@@ -66,5 +66,5 @@ public class PatientController {
   public ResponseEntity<Void> deletePatient(@PathVariable UUID id) {
     patientService.deletePatient(id);
     return ResponseEntity.noContent().build();
-  }
+  } 
 }
