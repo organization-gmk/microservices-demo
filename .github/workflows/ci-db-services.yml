@@ -7,6 +7,11 @@ on:
             - java-spring-microservices/auth-service/**
             - java-spring-microservices/patient-service/**
     workflow_dispatch:
+      inputs:
+        environment:
+            description: "Select deployment environment"
+            required: true
+            default: "edfx-dev"
 
 permissions:
     id-token: write

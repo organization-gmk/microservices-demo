@@ -8,6 +8,11 @@ on:
             - java-spring-microservices/billing-service/**
             - java-spring-microservices/analytics-service/**
     workflow_dispatch:
+      inputs:
+        environment:
+            description: "Select deployment environment"
+            required: true
+            default: "edfx-dev"
 
 permissions:
     id-token: write
