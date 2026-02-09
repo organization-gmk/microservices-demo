@@ -25,7 +25,7 @@ env:
 jobs:
     build-non-db-services:
         runs-on: ubuntu-latest
-        environment: edfx-dev
+        environment: ${{inputs.environment}}
 
         strategy:
             fail-fast: false

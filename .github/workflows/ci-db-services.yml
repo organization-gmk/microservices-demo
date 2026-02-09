@@ -1,120 +1,145 @@
 name: DB Services CI/CD
 
 on:
-    push:
-        branches: [main]
-        paths:
-            - java-spring-microservices/auth-service/**
-            - java-spring-microservices/patient-service/**
-    workflow_dispatch:
-      inputs:
-        environment:
-            description: "Select deployment environment"
-            required: true
-            default: "edfx-dev"
+  push:
+    branches: [main]
+    paths:
+      - java-spring-microservices/auth-service/**
+      - java-spring-microservices/patient-service/**
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select deployment environment"
+        required: true
+        default: "edfx-dev"
 
 permissions:
-    id-token: write
-    contents: read
+  id-token: write
+  contents: read
 
 env:
-    JAVA_VERSION: "21"
-    BASE_DIR: java-spring-microservices
-    
+  JAVA_VERSION: "21"
+  BASE_DIR: java-spring-microservices
 
 jobs:
-    build-db-services:
-        runs-on: ubuntu-latest
-        environment: edfx-dev
+  build-db-services:
+    runs-on: ubuntu-latest
+    environment: ${{inputs.environment}}
 
-        strategy:
-            fail-fast: false
-            matrix:
-                service:
-                    - auth-service
-                    - patient-service
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - patient-service
 
-        services:
-            postgres:
-                image: postgres:15
-                env:
-                    POSTGRES_DB: testdb
-                    POSTGRES_USER: testuser
-                    POSTGRES_PASSWORD: testpass
-                options: >-
-                    --health-cmd="pg_isready"
-                    --health-interval=10s
-                    --health-timeout=5s
-                    --health-retries=5
-                ports:
-                    - 5432:5432
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd="pg_isready"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 5432:5432
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      # ---------------- CHECKOUT ----------------
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Set up Java 21
-              uses: actions/setup-java@v4
-              with:
-                  distribution: temurin
-                  java-version: ${{ env.JAVA_VERSION }}
-                  cache: maven
+      # ---------------- JAVA + MAVEN CACHE ----------------
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
 
-            - name: Checkstyle
-              run: |
-                  cd $BASE_DIR/${{ matrix.service }}
-                  mvn checkstyle:check -Dcheckstyle.failOnViolation=false
+      # ---------------- OWASP CACHE ----------------
+      - name: Cache OWASP Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: owasp-${{ runner.os }}
+          restore-keys: |
+            owasp-${{ runner.os }}
 
-            - name: OWASP Dependency Check
-              run: |
-                  cd $BASE_DIR/${{ matrix.service }}
-                  mvn org.owasp:dependency-check-maven:check
-              env:
-                  NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+      # ---------------- CODE QUALITY ----------------
+      - name: Checkstyle
+        run: |
+          cd $BASE_DIR/${{ matrix.service }}
+          mvn checkstyle:check -Dcheckstyle.failOnViolation=false
 
-            - name: Run tests
-              run: |
-                  cd $BASE_DIR/${{ matrix.service }}
-                  mvn clean verify
-              env:
-                  SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
-                  SPRING_DATASOURCE_USERNAME: testuser
-                  SPRING_DATASOURCE_PASSWORD: testpass
-                  SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      - name: OWASP Dependency Check
+        run: |
+          cd $BASE_DIR/${{ matrix.service }}
+          mvn org.owasp:dependency-check-maven:check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
-            - name: SonarCloud analysis
-              run: |
-                  cd $BASE_DIR/${{ matrix.service }}
-                  mvn sonar:sonar \
-                    -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }} \
-                    -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
-                    -Dsonar.host.url=https://sonarcloud.io \
-                    -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+      # ---------------- TESTS ----------------
+      - name: Run tests
+        run: |
+          cd $BASE_DIR/${{ matrix.service }}
+          mvn clean verify
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: testuser
+          SPRING_DATASOURCE_PASSWORD: testpass
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
 
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  aws-region: ${{ vars.AWS_REGION }}
-                  role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
+      # ---------------- SONAR ----------------
+      - name: SonarCloud analysis
+        run: |
+          cd $BASE_DIR/${{ matrix.service }}
+          mvn sonar:sonar \
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }} \
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
-            - name: Login to ECR
-              id: login-ecr
-              uses: aws-actions/amazon-ecr-login@v2
+      # ---------------- AWS AUTH ----------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
 
-            - name: Build Docker image
-              run: |
-                  cd $BASE_DIR/${{ matrix.service }}
-                  TAG=${GITHUB_SHA::7}
-                  docker build -t ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:$TAG .
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-            - name: Trivy scan
-              uses: aquasecurity/trivy-action@0.20.0
-              with:
-                  image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:${{ github.sha }}
-                  severity: CRITICAL,HIGH
-                  exit-code: 1
+      # ---------------- DOCKER CACHE ----------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-            - name: Push Docker image
-              run: |
-                  TAG=${GITHUB_SHA::7}
-                  docker push ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:$TAG
+      - name: Build Docker image (with cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.BASE_DIR }}/${{ matrix.service }}
+          push: false
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---------------- SECURITY SCAN ----------------
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      # ---------------- PUSH IMAGE ----------------
+      - name: Push Docker image
+        run: |
+          TAG=${GITHUB_SHA::7}
+          docker push ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:$TAG
