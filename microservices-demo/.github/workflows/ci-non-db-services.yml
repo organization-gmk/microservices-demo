@@ -1,0 +1,95 @@
+name: Non-DB Services CI/CD
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - java-spring-microservices/api-gateway/**
+            - java-spring-microservices/billing-service/**
+            - java-spring-microservices/analytics-service/**
+    workflow_dispatch:
+
+permissions:
+    id-token: write
+    contents: read
+
+env:
+    JAVA_VERSION: "21"
+    BASE_DIR: java-spring-microservices
+
+jobs:
+    build-non-db-services:
+        runs-on: ubuntu-latest
+
+        strategy:
+            fail-fast: false
+            matrix:
+                service:
+                    - api-gateway
+                    - billing-service
+                    - analytics-service
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Java 21
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: ${{ env.JAVA_VERSION }}
+                  cache: maven
+
+            - name: Checkstyle
+              run: |
+                  cd $BASE_DIR/${{ matrix.service }}
+                  mvn checkstyle:check -Dcheckstyle.failOnViolation=false
+
+            - name: OWASP Dependency Check
+              run: |
+                  cd $BASE_DIR/${{ matrix.service }}
+                  mvn org.owasp:dependency-check-maven:check
+              env:
+                  NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+            - name: Build & test
+              run: |
+                  cd $BASE_DIR/${{ matrix.service }}
+                  mvn clean verify
+
+            - name: SonarCloud analysis
+              run: |
+                  cd $BASE_DIR/${{ matrix.service }}
+                  mvn sonar:sonar \
+                    -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }} \
+                    -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
+                    -Dsonar.host.url=https://sonarcloud.io \
+                    -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-region: ${{ vars.AWS_REGION }}
+                  role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
+
+            - name: Login to ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v2
+
+            - name: Build Docker image
+              run: |
+                  cd $BASE_DIR/${{ matrix.service }}
+                  TAG=${GITHUB_SHA::7}
+                  docker build -t ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:$TAG .
+
+            - name: Trivy scan
+              uses: aquasecurity/trivy-action@0.20.0
+              with:
+                  image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:${{ github.sha }}
+                  severity: CRITICAL,HIGH
+                  exit-code: 1
+
+            - name: Push Docker image
+              run: |
+                  TAG=${GITHUB_SHA::7}
+                  docker push ${{ steps.login-ecr.outputs.registry }}/micro-services:${{ matrix.service }}:$TAG
