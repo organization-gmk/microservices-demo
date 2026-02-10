@@ -96,15 +96,6 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
 
-
-      - name: Debug JaCoCo report
-        run: |
-          cd $BASE_DIR/${{ matrix.service }}
-          echo "=== target directory ==="
-          ls -R target || true
-
-
-
       # ---------------- SONAR ----------------
       - name: SonarCloud Scan
         run: |
@@ -116,7 +107,6 @@ jobs:
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.branch.name=main \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
 
