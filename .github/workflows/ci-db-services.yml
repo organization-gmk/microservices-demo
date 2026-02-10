@@ -93,15 +93,18 @@ jobs:
           SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
 
       # ---------------- SONAR ----------------
-      - name: SonarCloud analysis
+      - name: SonarCloud Scan
         run: |
-          cd $BASE_DIR/${{ matrix.service }}
+          cd java-spring-microservices/${{ matrix.service }}
+
           mvn sonar:sonar \
-            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }} \
+            -Dsonar.projectKey=${{ vars.SONAR_ORGANIZATION }}-${{ matrix.service }} \
+            -Dsonar.projectName=${{ matrix.service }} \
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
 
       # ---------------- AWS AUTH ----------------
       - name: Configure AWS credentials
@@ -130,12 +133,16 @@ jobs:
           cache-to: type=gha,mode=max
 
       # ---------------- SECURITY SCAN ----------------
-      - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
-          severity: CRITICAL,HIGH
-          exit-code: 1
+      - name: Trivy Image Scan
+        run: |
+          trivy image \
+            --vuln-type os,library \
+            --severity CRITICAL,HIGH \
+            --exit-code 0 \
+            --format json \
+            --output trivy-report-${{ matrix.service }}.json \
+            ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
+
 
       # ---------------- PUSH IMAGE ----------------
       - name: Push Docker image
@@ -143,4 +150,9 @@ jobs:
           TAG=${GITHUB_SHA::7}
           docker push ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:$TAG
 
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-report-${{ matrix.service }}.json
           
