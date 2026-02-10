@@ -92,6 +92,15 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
 
+
+      - name: Debug JaCoCo report
+        run: |
+          cd $BASE_DIR/${{ matrix.service }}
+          echo "=== target directory ==="
+          ls -R target || true
+
+
+
       # ---------------- SONAR ----------------
       - name: SonarCloud Scan
         run: |
@@ -134,15 +143,20 @@ jobs:
 
       # ---------------- SECURITY SCAN ----------------
       - name: Trivy Image Scan
-        run: |
-          trivy image \
-            --vuln-type os,library \
-            --severity CRITICAL,HIGH \
-            --exit-code 0 \
-            --format json \
-            --output trivy-report-${{ matrix.service }}.json \
-            ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: 0        
+          format: json
+          output: trivy-report-${{ matrix.service }}.json
 
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-report-${{ matrix.service }}.json
 
       # ---------------- PUSH IMAGE ----------------
       - name: Push Docker image
@@ -150,9 +164,5 @@ jobs:
           TAG=${GITHUB_SHA::7}
           docker push ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:$TAG
 
-      - name: Upload Trivy Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-${{ matrix.service }}
-          path: trivy-report-${{ matrix.service }}.json
+      
           
