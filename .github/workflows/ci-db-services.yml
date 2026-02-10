@@ -7,6 +7,9 @@ on:
       - java-spring-microservices/auth-service/**
       - java-spring-microservices/patient-service/**
       - java-spring-microservices/billing-service/**
+      - java-spring-microservices/api-gateway/**
+      - java-spring-microservices/analytics-service/**
+
   workflow_dispatch:
     inputs:
       environment:
@@ -34,6 +37,8 @@ jobs:
           - auth-service
           - patient-service
           - billing-service
+          - api-gateway
+          - analytics-service
 
     services:
       postgres:
