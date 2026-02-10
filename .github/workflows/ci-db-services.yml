@@ -6,6 +6,7 @@ on:
     paths:
       - java-spring-microservices/auth-service/**
       - java-spring-microservices/patient-service/**
+      - java-spring-microservices/billing-service/**
   workflow_dispatch:
     inputs:
       environment:
@@ -32,6 +33,7 @@ jobs:
         service:
           - auth-service
           - patient-service
+          - billing-service
 
     services:
       postgres:

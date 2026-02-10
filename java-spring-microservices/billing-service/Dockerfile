@@ -8,13 +8,13 @@ RUN mvn dependency:go-offline -B
 
 COPY src ./src
 
-RUN mvn clean package
+RUN mvn clean package -DskipTests
 
-FROM openjdk:21-jdk AS runner
+FROM eclipse-temurin:21-jre-jammy AS runner
 
 WORKDIR /app
 
-COPY --from=builder ./app/target/billing-service-0.0.1-SNAPSHOT.jar ./app.jar
+COPY --from=builder /app/target/billing-service-0.0.1-SNAPSHOT.jar /app.jar
 
 EXPOSE 4001
 EXPOSE 9001
