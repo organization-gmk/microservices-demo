@@ -122,6 +122,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.BASE_DIR }}/${{ matrix.service }}
+          load: true  
           push: false
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
