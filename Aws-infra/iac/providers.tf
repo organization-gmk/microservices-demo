@@ -6,12 +6,12 @@ provider "aws" {
 
 data "aws_eks_cluster" "gmk-cluster" {
   name = local.cluster_name
-  depends_on = [module.eks]
+  depends_on = module.eks.cluster_name
 }
 
 data "aws_eks_cluster_auth" "gmk-cluster" {
   name = local.cluster_name
-  depends_on = [module.eks]
+  depends_on = module.eks.cluster_name
 }
 
 provider "kubernetes" {
