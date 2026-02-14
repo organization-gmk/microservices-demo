@@ -115,16 +115,16 @@ jobs:
           name: terraform-plan
           path: terraform.plan
 
-      - name: Terraform Apply or Destroy
-        run: |
-          if [ "${{ inputs.Action }}" = "destroy" ]; then
-            echo "Performing Terraform Destroy..."
-            terraform apply -auto-approve terraform.plan
-          else
-            echo "Performing Terraform Apply..."
-            terraform apply -auto-approve terraform.plan
-            terraform show -json > terraform_state.json
-          fi
+      # - name: Terraform Apply or Destroy
+      #   run: |
+      #     if [ "${{ inputs.Action }}" = "destroy" ]; then
+      #       echo "Performing Terraform Destroy..."
+      #       terraform apply -auto-approve terraform.plan
+      #     else
+      #       echo "Performing Terraform Apply..."
+      #       terraform apply -auto-approve terraform.plan
+      #       terraform show -json > terraform_state.json
+      #     fi
 
       - name: Upload Terraform state JSON (for apply only)
         if: steps.check_action.outputs.action == 'apply'

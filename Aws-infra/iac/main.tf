@@ -23,7 +23,7 @@ module "iam" {
 module "eks" {
   source = "./modules/eks"
 
-  name_prefix            = local.name_prefix
+  cluster_name          = local.cluster_name
   cluster_version        = var.cluster_version
   cluster_iam_role_arn  = module.iam.cluster_iam_role_arn
   subnet_ids            = module.vpc.private_subnet
