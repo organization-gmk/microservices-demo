@@ -14,9 +14,7 @@ resource "aws_eks_cluster" "gmk_cluster" {
 
   tags = var.tags
 
-  depends_on = [
-    aws_cloudwatch_log_group.eks
-  ]
+
 }
 
 #---------------Node Group-----------------
