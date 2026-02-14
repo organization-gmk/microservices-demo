@@ -1,10 +1,7 @@
 name: Terraform Deployment Module
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - Aws-infra/iac/**
+    
   workflow_call:
     inputs:
       environment:
