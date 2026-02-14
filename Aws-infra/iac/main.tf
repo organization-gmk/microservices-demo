@@ -26,7 +26,7 @@ module "eks" {
   cluster_name          = local.cluster_name
   cluster_version        = var.cluster_version
   cluster_iam_role_arn  = module.iam.cluster_iam_role_arn
-  subnet_ids            = module.vpc.private_subnet
+  subnet_ids            = module.vpc.private_subnets
   cluster_sg_id         = module.vpc.cluster_sg_id
   cluster_log_types     = var.cluster_log_types
   ebs_csi_driver_role   = module.iam.ebs_csi_driver_role_arn
