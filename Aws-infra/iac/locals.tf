@@ -14,6 +14,8 @@ locals {
     ManagedBy   = "terraform"
   }, var.tags)
 
+  cluster_name = "${local.name_prefix}-cluster"
+
 }
 
 
