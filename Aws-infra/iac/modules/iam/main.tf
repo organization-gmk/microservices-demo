@@ -173,7 +173,7 @@ data "tls_certificate" "oidc" {
 resource "aws_iam_openid_connect_provider" "eks" {
 
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.oidc[0].certificates[0].sha1_fingerprint]
+  thumbprint_list = [data.tls_certificate.oidc.certificates.sha1_fingerprint]
   url             = var.oidc_provider_url
 }
 

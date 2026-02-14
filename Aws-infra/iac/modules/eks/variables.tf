@@ -83,7 +83,7 @@ variable "aws_load_balancer_controller_arn" {
   
 }
 
-variable "cw_observability_role_arn" {
+variable "cloudwatch_agent_role" {
   description = "CW Observability Role ARN"
   type        = string
   

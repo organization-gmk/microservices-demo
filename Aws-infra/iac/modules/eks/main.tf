@@ -69,7 +69,7 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 resource "aws_eks_addon" "cloudwatch_observability" {
   cluster_name             = aws_eks_cluster.gmk_cluster.name
   addon_name               = "amazon-cloudwatch-observability"
-  service_account_role_arn = vars.cw_observability_role_arn
+  service_account_role_arn = var.cloudwatch_agent_role
 
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"

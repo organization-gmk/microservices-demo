@@ -30,7 +30,7 @@ module "eks" {
   cluster_sg_id         = module.vpc.cluster_sg_id
   cluster_log_types     = var.cluster_log_types
   ebs_csi_driver_role   = module.iam.ebs_csi_driver_role_arn
-  cw_observability_role_arn = module.iam.cloudwatch_agent_role_arn
+  
   ebs_addon_version     = var.ebs_addon_version
   node_iam_role_arn     = module.iam.node_iam_role_arn
   node_groups           = var.node_groups
