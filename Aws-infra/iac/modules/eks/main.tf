@@ -77,8 +77,7 @@ resource "aws_eks_addon" "cloudwatch_observability" {
   tags = var.tags
 
   depends_on = [
-    aws_eks_node_group.gmk_node_group,
-    aws_iam_role_policy_attachment.cw_observability
+    aws_eks_node_group.gmk_node_group
   ]
 }
 #--------------AWS Load Balancer Controller----------------
