@@ -144,12 +144,12 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.eks[0].arn]
+      identifiers = [aws_iam_openid_connect_provider.eks.arn]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:sub"
+      variable = "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub"
       values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
     }
   }
@@ -289,7 +289,7 @@ resource "aws_iam_role" "aws_load_balancer_controller" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.eks[0].arn
+          Federated = aws_iam_openid_connect_provider.eks.arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
