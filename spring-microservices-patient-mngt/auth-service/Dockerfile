@@ -8,7 +8,7 @@ RUN mvn dependency:go-offline -B
 
 COPY src ./src
 
-mvn clean package -DskipTests -Dsonar.skip=true
+RUN mvn clean package -DskipTests -Dsonar.skip=true
 
 FROM eclipse-temurin:21-jre-jammy AS runner
 
