@@ -8,7 +8,7 @@ RUN mvn dependency:go-offline -B
 COPY src ./src
 
 # Build and repackage Spring Boot jar
-RUN mvn clean package -DskipTests
+mvn clean package -DskipTests -Dsonar.skip=true
 
 # 2️⃣ Runner Stage
 FROM eclipse-temurin:21-jre-jammy AS runner

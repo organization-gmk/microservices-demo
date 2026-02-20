@@ -8,7 +8,7 @@ RUN mvn dependency:go-offline -B
 
 COPY src ./src
 
-RUN mvn clean package -DskipTests 
+mvn clean package -DskipTests -Dsonar.skip=true
 
 # ---------------- RUNTIME STAGE ----------------
 FROM eclipse-temurin:21-jre-jammy AS runner
