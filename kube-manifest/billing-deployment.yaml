@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: billing-service
-          image: <your-ecr-image-uri>
+          image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/billing-service:02d1676e6cc09f638917df7dacac63c881a0be43
           imagePullPolicy: Always
           ports:
             - containerPort: 4001
