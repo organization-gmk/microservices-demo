@@ -34,7 +34,6 @@ resource "aws_eks_node_group" "gmk_node_group" {
 
   instance_types = each.value.instance_types
   ami_type       = each.value.ami_type
-  disk_size      = each.value.disk_size
   capacity_type  = each.value.capacity_type
 
   tags = merge(
@@ -58,6 +57,16 @@ resource "aws_launch_template" "node_group" {
   for_each = var.node_groups
 
   name_prefix = "${each.value.name}-"
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      volume_size = each.value.disk_size
+      volume_type = "gp3"
+      delete_on_termination = true
+    }
+  }
 
   tag_specifications {
     resource_type = "instance"
