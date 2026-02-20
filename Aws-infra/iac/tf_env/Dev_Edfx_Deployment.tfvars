@@ -8,7 +8,7 @@ ebs_addon_version = "v1.53.0-eksbuild.1"
 
 node_groups = {
   example-node-group = {
-    name           = "ecomm-uat-node-group"
+    name           = "microservices-edfx-node-group"
     desired_size   = 2
     min_size       = 1
     max_size       = 3

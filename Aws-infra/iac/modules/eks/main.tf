@@ -40,13 +40,44 @@ resource "aws_eks_node_group" "gmk_node_group" {
   tags = merge(
     var.tags,
     {
-      Name = "${each.value.name}-node"
+      Name = "${each.value.name}-node-group"
     }
   )
+
+  launch_template {
+    name    = aws_launch_template.node_group[each.key].name
+    version = "$Latest"
+  }
 
   depends_on = [
     aws_eks_cluster.gmk_cluster
   ]
+}
+
+resource "aws_launch_template" "node_group" {
+  for_each = var.node_groups
+
+  name_prefix = "${each.value.name}-"
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = merge(
+      var.tags,
+      {
+        Name = "${each.value.name}-node"
+      }
+    )
+  }
+
+  tag_specifications {
+    resource_type = "volume"
+    tags = merge(
+      var.tags,
+      {
+        Name = "${each.value.name}-volume"
+      }
+    )
+  }
 }
 
 #--------------EBS CSI Driver IAM Role----------------
@@ -90,4 +121,5 @@ resource "kubernetes_service_account_v1" "aws_load_balancer_controller" {
       "eks.amazonaws.com/role-arn" = var.aws_load_balancer_controller_arn
     }
   }
+  depends_on = [module.eks]
 }
