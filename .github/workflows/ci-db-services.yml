@@ -23,7 +23,7 @@ permissions:
 
 env:
   JAVA_VERSION: "21"
-  BASE_DIR: java-spring-microservices
+  BASE_DIR: spring-microservices-patient-mngt
 
 jobs:
   build-db-services:
