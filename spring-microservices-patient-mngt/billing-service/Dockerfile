@@ -7,14 +7,15 @@ RUN mvn dependency:go-offline -B
 
 COPY src ./src
 
-# Build jar, now always produces target/app.jar
+# Build and repackage Spring Boot jar
 RUN mvn clean package -DskipTests
 
 # 2️⃣ Runner Stage
 FROM eclipse-temurin:21-jre-jammy AS runner
 WORKDIR /app
 
-COPY --from=builder /app/target/app.jar /app.jar
+# Copy the **Spring Boot repackaged JAR**
+COPY --from=builder /app/target/*-SNAPSHOT.jar /app.jar
 
 EXPOSE 4001
 EXPOSE 9001

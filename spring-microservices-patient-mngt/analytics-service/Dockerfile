@@ -14,7 +14,8 @@ FROM eclipse-temurin:21-jre-jammy AS runner
 
 WORKDIR /app
 
-COPY --from=builder /app/target/app.jar /app.jar
+COPY --from=builder /app/target/*-SNAPSHOT.jar /app.jar
+
 EXPOSE 4002
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
