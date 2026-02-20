@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - java-spring-microservices/auth-service/**
-      - java-spring-microservices/patient-service/**
-      - java-spring-microservices/billing-service/**
-      - java-spring-microservices/api-gateway/**
-      - java-spring-microservices/analytics-service/**
+      - spring-microservices-patient-mngt/auth-service/**
+      - spring-microservices-patient-mngt/patient-service/**
+      - spring-microservices-patient-mngt/billing-service/**
+      - spring-microservices-patient-mngt/api-gateway/**
+      - spring-microservices-patient-mngt/analytics-service/**
 
   workflow_dispatch:
     inputs:
@@ -77,7 +77,6 @@ jobs:
           restore-keys: |
             owasp-${{ runner.os }}-
 
-
       # ---------------- CODE QUALITY ----------------
       - name: Checkstyle
         run: |
@@ -86,11 +85,11 @@ jobs:
 
       - name: OWASP Dependency Check
         run: |
-            cd $BASE_DIR/${{ matrix.service }}
-            mvn org.owasp:dependency-check-maven:12.2.0:check \
-            -Dnvd.api.key=${{ secrets.NVD_API_KEY }} \
-            -Dnvd.api.delay=2000 \
-            -DfailOnError=false
+          cd $BASE_DIR/${{ matrix.service }}
+          mvn org.owasp:dependency-check-maven:12.2.0:check \
+          -Dnvd.api.key=${{ secrets.NVD_API_KEY }} \
+          -Dnvd.api.delay=2000 \
+          -DfailOnError=false
 
       # ---------------- TESTS ----------------
       - name: Run tests
@@ -107,7 +106,6 @@ jobs:
       - name: SonarCloud Scan
         run: |
           cd java-spring-microservices/${{ matrix.service }}
-
           mvn sonar:sonar \
             -Dsonar.projectKey=${{ vars.SONAR_ORGANIZATION }}-${{ matrix.service }} \
             -Dsonar.projectName=${{ matrix.service }} \
@@ -115,7 +113,6 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-
 
       # ---------------- AWS AUTH ----------------
       - name: Configure AWS credentials
@@ -132,14 +129,48 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image (with cache)
+      # ---------------- AUTO-INCREMENT VERSION ----------------
+      - name: Get next version from ECR
+        id: version
+        run: |
+          echo "Fetching latest version for ${{ matrix.service }} from ECR..."
+          
+          # Try to get the latest version tag from ECR
+          LATEST_VERSION=$(aws ecr describe-images \
+            --repository-name micro-services/${{ matrix.service }} \
+            --query 'sort_by(imageDetails, &imagePushedAt)[-1].imageTags[0]' \
+            --output text 2>/dev/null || echo "V0.0.0")
+          
+          echo "Latest version in ECR: $LATEST_VERSION"
+          
+          # Extract version number and increment patch
+          if [[ $LATEST_VERSION =~ V([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            MAJOR=${BASH_REMATCH[1]}
+            MINOR=${BASH_REMATCH[2]}
+            PATCH=${BASH_REMATCH[3]}
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="V$MAJOR.$MINOR.$NEW_PATCH"
+          else
+            # If no valid version found, start at V0.0.1
+            NEW_VERSION="V0.0.1"
+          fi
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version for this build: $NEW_VERSION"
+          
+          # Store in file for reference
+          echo $NEW_VERSION > version-${{ matrix.service }}.txt
+
+      # ---------------- BUILD WITH AUTO-INCREMENTED VERSION ----------------
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.BASE_DIR }}/${{ matrix.service }}
-          load: true  
+          load: true
           push: false
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ steps.version.outputs.version }}
+            ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -147,7 +178,7 @@ jobs:
       - name: Trivy Image Scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ steps.version.outputs.version }}
           vuln-type: os,library
           severity: CRITICAL,HIGH
           exit-code: 0        
@@ -163,7 +194,12 @@ jobs:
       # ---------------- PUSH IMAGE ----------------
       - name: Push Docker image
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }}:${{ github.sha }}
-
-      
+          echo "Pushing ${{ steps.version.outputs.version }} to ECR..."
+          docker push ${{ steps.login-ecr.outputs.registry }}/micro-services/${{ matrix.service }} --all-tags
           
+      # ---------------- UPLOAD VERSION INFO ----------------
+      - name: Upload version info
+        uses: actions/upload-artifact@v4
+        with:
+          name: version-${{ matrix.service }}
+          path: version-${{ matrix.service }}.txt

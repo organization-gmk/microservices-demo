@@ -8,13 +8,14 @@ RUN mvn dependency:go-offline -B
 
 COPY src ./src
 
-RUN mvn clean package -DskipTests
+RUN mvn clean package -DskipTests \
+    && cp target/*.jar /app/app.jar
 
 FROM eclipse-temurin:21-jre-jammy AS runner
 
 WORKDIR /app
 
-COPY --from=builder /app/target/analytics-service-0.0.1-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/app.jar /app.jar
 EXPOSE 4002
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
