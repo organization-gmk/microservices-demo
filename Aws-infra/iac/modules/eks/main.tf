@@ -121,5 +121,4 @@ resource "kubernetes_service_account_v1" "aws_load_balancer_controller" {
       "eks.amazonaws.com/role-arn" = var.aws_load_balancer_controller_arn
     }
   }
-  depends_on = [module.eks]
 }
