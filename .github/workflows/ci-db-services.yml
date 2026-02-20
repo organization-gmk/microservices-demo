@@ -105,7 +105,7 @@ jobs:
       # ---------------- SONAR ----------------
       - name: SonarCloud Scan
         run: |
-          cd $BASE_DIR/${{ matrix.service }}
+          cd spring-microservices-patient-mngt/${{ matrix.service }}
           mvn sonar:sonar \
             -Dsonar.projectKey=${{ vars.SONAR_ORGANIZATION }}-${{ matrix.service }} \
             -Dsonar.projectName=${{ matrix.service }} \
