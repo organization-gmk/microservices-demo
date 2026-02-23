@@ -65,6 +65,12 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
+      - name: Remove broken Kubernetes ServiceAccount from state
+        run: |
+          echo "Removing module.eks.kubernetes_service_account_v1.aws_load_balancer_controller from Terraform state..."
+          terraform state rm module.eks.kubernetes_service_account_v1.aws_load_balancer_controller
+
+
       - name: Terraform Validate
         run: terraform validate
 
@@ -133,4 +139,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state
+
           path: terraform_state.json
