@@ -63,74 +63,79 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
-      - name: Terraform Validate
-        run: terraform validate
-
-      - name: Terraform Plan for Apply
-        if: steps.check_action.outputs.action == 'apply'
+      - name: Remove broken Kubernetes ServiceAccount from state
         run: |
-          export TF_LOG=INFO
-          terraform plan -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
+          echo "Removing module.eks.kubernetes_service_account_v1.aws_load_balancer_controller from Terraform state..."
+          terraform state rm module.eks.kubernetes_service_account_v1.aws_load_balancer_controller
 
-      - name: Terraform Plan for Destroy
-        if: steps.check_action.outputs.action == 'destroy'
-        run: |
-          export TF_LOG=INFO
-          terraform plan -destroy -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
+      # - name: Terraform Validate
+      #   run: terraform validate
 
-      # Infracost only for apply action
-      # - name: Setup Infracost
-      #   if: steps.check_action.outputs.action == 'apply'
-      #   uses: infracost/actions/setup@v3
-      #   with:
-      #     api-key: ${{ secrets.INFRACOST_API_KEY }}
-
-      # - name: Convert Terraform Plan to JSON
-      #   if: steps.check_action.outputs.action == 'apply'
-      #   run: terraform show -json terraform.plan > plan.json
-
-      # - name: Generate Infracost Report
+      # - name: Terraform Plan for Apply
       #   if: steps.check_action.outputs.action == 'apply'
       #   run: |
-      #     # Display in pipeline console
-      #     echo "=== INFRASTRUCTURE COST ESTIMATE ==="
-      #     infracost breakdown --path plan.json --format table
-          
-      #     # Generate file for artifact
-      #     infracost breakdown --path plan.json --format html --out-file infracost-report.html
-      #     infracost breakdown --path plan.json --format json --out-file infracost-report.json
+      #     export TF_LOG=INFO
+      #     terraform plan -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
 
-      # - name: Upload Infracost Report
+      # - name: Terraform Plan for Destroy
+      #   if: steps.check_action.outputs.action == 'destroy'
+      #   run: |
+      #     export TF_LOG=INFO
+      #     terraform plan -destroy -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
+
+      # # Infracost only for apply action
+      # # - name: Setup Infracost
+      # #   if: steps.check_action.outputs.action == 'apply'
+      # #   uses: infracost/actions/setup@v3
+      # #   with:
+      # #     api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      # # - name: Convert Terraform Plan to JSON
+      # #   if: steps.check_action.outputs.action == 'apply'
+      # #   run: terraform show -json terraform.plan > plan.json
+
+      # # - name: Generate Infracost Report
+      # #   if: steps.check_action.outputs.action == 'apply'
+      # #   run: |
+      # #     # Display in pipeline console
+      # #     echo "=== INFRASTRUCTURE COST ESTIMATE ==="
+      # #     infracost breakdown --path plan.json --format table
+          
+      # #     # Generate file for artifact
+      # #     infracost breakdown --path plan.json --format html --out-file infracost-report.html
+      # #     infracost breakdown --path plan.json --format json --out-file infracost-report.json
+
+      # # - name: Upload Infracost Report
+      # #   if: steps.check_action.outputs.action == 'apply'
+      # #   uses: actions/upload-artifact@v4
+      # #   with:
+      # #     name: infracost-report
+      # #     path: |
+      # #       infracost-report.html
+      # #       infracost-report.json
+
+      # - name: Store plan
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: terraform-plan
+      #     path: terraform.plan
+
+      # - name: Terraform Apply or Destroy
+      #   run: |
+      #     if [ "${{ inputs.Action }}" = "destroy" ]; then
+      #       echo "Performing Terraform Destroy..."
+      #       terraform apply -auto-approve terraform.plan
+      #     else
+      #       echo "Performing Terraform Apply..."
+      #       terraform apply -auto-approve terraform.plan
+      #       terraform show -json > terraform_state.json
+      #     fi
+
+      # - name: Upload Terraform state JSON (for apply only)
       #   if: steps.check_action.outputs.action == 'apply'
       #   uses: actions/upload-artifact@v4
       #   with:
-      #     name: infracost-report
-      #     path: |
-      #       infracost-report.html
-      #       infracost-report.json
-
-      - name: Store plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: terraform.plan
-
-      - name: Terraform Apply or Destroy
-        run: |
-          if [ "${{ inputs.Action }}" = "destroy" ]; then
-            echo "Performing Terraform Destroy..."
-            terraform apply -auto-approve terraform.plan
-          else
-            echo "Performing Terraform Apply..."
-            terraform apply -auto-approve terraform.plan
-            terraform show -json > terraform_state.json
-          fi
-
-      - name: Upload Terraform state JSON (for apply only)
-        if: steps.check_action.outputs.action == 'apply'
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-state
-          path: terraform_state.json
+      #     name: terraform-state
+      #     path: terraform_state.json
 
       
