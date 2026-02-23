@@ -15,7 +15,7 @@ FROM eclipse-temurin:21-jre-alpine AS runner
 WORKDIR /app
 
 # Copy the **Spring Boot repackaged JAR**
-COPY --from=builder /app/target/*-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/target/*-SNAPSHOT.jar app.jar
 
 EXPOSE 4001
 EXPOSE 9001
