@@ -10,7 +10,7 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests -Dsonar.skip=true
 
-FROM eclipse-temurin:21-jre-jammy AS runner
+FROM eclipse-temurin:21-jre-alpine AS runner
 
 WORKDIR /app
 

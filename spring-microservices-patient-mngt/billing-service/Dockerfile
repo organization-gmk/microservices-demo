@@ -11,7 +11,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests -Dsonar.skip=true
 
 # 2️⃣ Runner Stage
-FROM eclipse-temurin:21-jre-jammy AS runner
+FROM eclipse-temurin:21-jre-alpine AS runner
 WORKDIR /app
 
 # Copy the **Spring Boot repackaged JAR**
