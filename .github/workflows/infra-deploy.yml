@@ -1,7 +1,6 @@
 name: Terraform Deployment Module
 
 on:
-    
   workflow_call:
     inputs:
       environment:
@@ -32,7 +31,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     container:
-      image: hashicorp/terraform:1.5.0
+      image: krishna0011/awscli-tf-1.5:latest
+      credentials:
+        username: ${{ vars.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PAT }}
     defaults:
       run:
         working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
@@ -62,11 +64,6 @@ jobs:
         run: |
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
-
-      # - name: Remove broken Kubernetes ServiceAccount from state
-      #   run: |
-      #     echo "Removing module.eks.kubernetes_service_account_v1.aws_load_balancer_controller from Terraform state..."
-      #     terraform state rm module.eks.kubernetes_service_account_v1.aws_load_balancer_controller
 
       - name: Terraform Validate
         run: terraform validate
@@ -137,5 +134,3 @@ jobs:
         with:
           name: terraform-state
           path: terraform_state.json
-
-      
