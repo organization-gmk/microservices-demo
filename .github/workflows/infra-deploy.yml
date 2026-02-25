@@ -68,26 +68,19 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
       
-      - name: Debug - Check working directory
+      - name: Debug - Check .terraform folder
         run: |
-          echo "Current working directory: $(pwd)"
+          echo "Current directory: $(pwd)"
           echo "Contents:"
           ls -la
-          echo "Checking for .terraform folder:"
-          if [ -d ".terraform" ]; then
-            echo "✅ .terraform folder exists"
-            echo "Contents of .terraform:"
-            ls -la .terraform/
-          else
-            echo "❌ .terraform folder NOT found!"
-            exit 1
-          fi
+          echo ".terraform folder contents:"
+          ls -la .terraform/ || echo "❌ .terraform folder not found"
       
       - name: Upload .terraform folder
         uses: actions/upload-artifact@v4
         with:
           name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/.terraform
+          path: .terraform
           retention-days: 1
           if-no-files-found: error
 
@@ -126,6 +119,9 @@ jobs:
 
       - name: Verify .terraform folder
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Contents after download:"
+          ls -la
           if [ -d ".terraform" ]; then
             echo "✅ .terraform folder downloaded successfully"
             ls -la .terraform/
@@ -174,6 +170,7 @@ jobs:
 
       - name: Verify .terraform folder
         run: |
+          echo "Current directory: $(pwd)"
           if [ -d ".terraform" ]; then
             echo "✅ .terraform folder downloaded successfully"
           else
@@ -213,7 +210,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/terraform.plan
+          path: terraform.plan
           retention-days: 1
           if-no-files-found: error
 
@@ -222,7 +219,6 @@ jobs:
     name: "Terraform ${{ inputs.Action }}"
     needs: [plan]
     if: |
-      always() &&
       needs.plan.result == 'success' && 
       (needs.plan.outputs.has_changes == 'true' || inputs.Action == 'destroy')
     runs-on: ubuntu-latest
@@ -262,6 +258,10 @@ jobs:
 
       - name: Verify artifacts
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Contents:"
+          ls -la
+          
           if [ -d ".terraform" ]; then
             echo "✅ .terraform folder exists"
           else
@@ -271,6 +271,7 @@ jobs:
           
           if [ -f "terraform.plan" ]; then
             echo "✅ terraform.plan file exists"
+            ls -la terraform.plan
           else
             echo "❌ terraform.plan file not found"
             exit 1
@@ -298,4 +299,33 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
- 
+  # Job 5: Skip Notification (when no changes)
+  skip-notification:
+    name: "No Changes Detected"
+    needs: [plan]
+    if: |
+      needs.plan.result == 'success' && 
+      needs.plan.outputs.has_changes == 'false' && 
+      inputs.Action == 'apply'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify no changes
+        run: |
+          echo "###########################################"
+          echo "#                                         #"
+          echo "#   ✅ No infrastructure changes detected  #"
+          echo "#   🚫 Terraform apply will be skipped     #"
+          echo "#                                         #"
+          echo "###########################################"
+
+  # Job 6: Cleanup (optional)
+  cleanup:
+    name: "Cleanup Artifacts"
+    needs: [apply-or-destroy, skip-notification]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup old artifacts
+        run: |
+          echo "🧹 Cleaning up temporary artifacts..."
+          echo "✅ Artifacts with run_id: ${{ github.run_id }} for environment: ${{ inputs.environment }} will expire based on retention policy"
