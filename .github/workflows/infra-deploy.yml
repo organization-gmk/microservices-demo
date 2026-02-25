@@ -19,313 +19,206 @@ on:
         required: false
         type: string
         default: "apply"
-        description: "Terraform action to perform (apply or destroy)"
 
 permissions:
   contents: read
-  issues: write
+  id-token: write
 
 jobs:
-  # Job 1: Setup and Init
-  setup-and-init:
-    name: "Setup & Terraform Init"
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    container:
-      image: krishna0011/awscli-tf-1.5:latest
-      credentials:
-        username: ${{ vars.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PAT }}
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      action_type: ${{ steps.check_action.outputs.action }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check Action Type
-        id: check_action
-        run: |
-          if [ "${{ inputs.Action }}" = "destroy" ]; then
-            echo "action=destroy" >> $GITHUB_OUTPUT
-          else
-            echo "action=apply" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Terraform Init (with backend config)
-        run: |
-          rm -rf .terraform
-          terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
-      
-      - name: Debug - Check .terraform folder
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Contents:"
-          ls -la
-          echo ".terraform folder contents:"
-          ls -la .terraform/ || echo "❌ .terraform folder not found"
-      
-      - name: Upload .terraform folder
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
-          path: .terraform
-          retention-days: 1
-          if-no-files-found: error
-
-  # Job 2: Validation
+  ############################################
+  # 1️⃣ VALIDATE
+  ############################################
   validate:
-    name: "Terraform Validate"
-    needs: setup-and-init
+    name: Terraform Validate
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+
     container:
       image: krishna0011/awscli-tf-1.5:latest
       credentials:
         username: ${{ vars.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PAT }}
+
     defaults:
       run:
         working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-    permissions:
-      id-token: write
-      contents: read
+
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download .terraform folder
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
-      - name: Verify .terraform folder
+      - name: Terraform Init
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Contents after download:"
-          ls -la
-          if [ -d ".terraform" ]; then
-            echo "✅ .terraform folder downloaded successfully"
-            ls -la .terraform/
-          else
-            echo "❌ .terraform folder not found"
-            exit 1
-          fi
+          terraform init \
+            -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
       - name: Terraform Validate
         run: terraform validate
 
-  # Job 3: Plan (Apply or Destroy based on Action)
+
+  ############################################
+  # 2️⃣ PLAN
+  ############################################
   plan:
-    name: "Terraform Plan (${{ inputs.Action }})"
-    needs: validate
+    name: Terraform Plan (${{ inputs.Action }})
     runs-on: ubuntu-latest
+    needs: validate
     environment: ${{ inputs.environment }}
+
     container:
       image: krishna0011/awscli-tf-1.5:latest
       credentials:
         username: ${{ vars.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PAT }}
+
     defaults:
       run:
         working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-    permissions:
-      id-token: write
-      contents: read
+
     outputs:
-      has_changes: ${{ steps.check_plan_changes.outputs.has_changes }}
+      has_changes: ${{ steps.check.outputs.has_changes }}
+
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download .terraform folder
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
-      - name: Verify .terraform folder
+      - name: Terraform Init
         run: |
-          echo "Current directory: $(pwd)"
-          if [ -d ".terraform" ]; then
-            echo "✅ .terraform folder downloaded successfully"
-          else
-            echo "❌ .terraform folder not found"
-            exit 1
-          fi
+          terraform init \
+            -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
-      - name: Terraform Plan for Apply
+      - name: Terraform Plan (Apply)
         if: inputs.Action == 'apply'
         run: |
-          export TF_LOG=INFO
-          terraform plan -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
+          terraform plan \
+            -out terraform.plan \
+            -input=false \
+            -var-file=${{ inputs.Terraform_Deployment_Configuration_File }}
 
-      - name: Terraform Plan for Destroy
+      - name: Terraform Plan (Destroy)
         if: inputs.Action == 'destroy'
         run: |
-          export TF_LOG=INFO
-          terraform plan -destroy -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
+          terraform plan \
+            -destroy \
+            -out terraform.plan \
+            -input=false \
+            -var-file=${{ inputs.Terraform_Deployment_Configuration_File }}
 
       - name: Check if plan has changes
-        id: check_plan_changes
+        id: check
         run: |
-          if [ -f "terraform.plan" ]; then
-            if terraform show -json terraform.plan | jq -e '.resource_changes[] | select(.change.actions != ["no-op"])' > /dev/null 2>&1; then
+          if terraform show -json terraform.plan | \
+            jq -e '.resource_changes[] | select(.change.actions != ["no-op"])' > /dev/null; then
               echo "has_changes=true" >> $GITHUB_OUTPUT
-              echo "✅ Terraform plan has changes that will be applied."
-            else
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-              echo "ℹ️ No changes detected in Terraform plan."
-            fi
+              echo "✅ Changes detected"
           else
-            echo "❌ terraform.plan file not found"
-            exit 1
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "ℹ️ No changes detected"
           fi
 
-      - name: Upload terraform plan
+      - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
-          path: terraform.plan
+          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/terraform.plan
           retention-days: 1
-          if-no-files-found: error
 
-  # Job 4: Apply or Destroy
+
+  ############################################
+  # 3️⃣ APPLY / DESTROY
+  ############################################
   apply-or-destroy:
-    name: "Terraform ${{ inputs.Action }}"
-    needs: [plan]
-    if: |
-      needs.plan.result == 'success' && 
-      (needs.plan.outputs.has_changes == 'true' || inputs.Action == 'destroy')
+    name: Terraform ${{ inputs.Action }}
     runs-on: ubuntu-latest
+    needs: plan
     environment: ${{ inputs.environment }}
+
+    if: |
+      needs.plan.result == 'success' &&
+      (needs.plan.outputs.has_changes == 'true' || inputs.Action == 'destroy')
+
     container:
       image: krishna0011/awscli-tf-1.5:latest
       credentials:
         username: ${{ vars.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PAT }}
+
     defaults:
       run:
         working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-    permissions:
-      id-token: write
-      contents: read
+
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
-      - name: Download .terraform folder
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
-      - name: Download terraform plan
+      - name: Download Terraform Plan
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
           path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
 
-      - name: Verify artifacts
+      - name: Verify Plan Exists
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Contents:"
           ls -la
-          
-          if [ -d ".terraform" ]; then
-            echo "✅ .terraform folder exists"
-          else
-            echo "❌ .terraform folder not found"
-            exit 1
-          fi
-          
-          if [ -f "terraform.plan" ]; then
-            echo "✅ terraform.plan file exists"
-            ls -la terraform.plan
-          else
-            echo "❌ terraform.plan file not found"
+          if [ ! -f terraform.plan ]; then
+            echo "❌ terraform.plan not found"
             exit 1
           fi
 
-      - name: Terraform Apply or Destroy
+      - name: Terraform Apply / Destroy
         run: |
-          if [ "${{ inputs.Action }}" = "destroy" ]; then
-            echo "🔥 Performing Terraform Destroy..."
-            terraform apply -auto-approve terraform.plan
-            echo "✅ Terraform Destroy completed successfully!"
-          else
-            echo "🚀 Performing Terraform Apply..."
-            terraform apply -auto-approve terraform.plan
-            echo "✅ Terraform Apply completed successfully!"
-            terraform show -json > terraform_state.json
-          fi
+          terraform apply -auto-approve terraform.plan
 
-      - name: Upload Terraform state JSON (for apply only)
+      - name: Export State JSON (apply only)
+        if: inputs.Action == 'apply'
+        run: terraform show -json > terraform_state.json
+
+      - name: Upload Terraform State JSON
         if: inputs.Action == 'apply'
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state-${{ github.run_id }}-${{ inputs.environment }}
-          path: terraform_state.json
+          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/terraform_state.json
           retention-days: 30
-          if-no-files-found: warn
 
-  # Job 5: Skip Notification (when no changes)
+
+  ############################################
+  # 4️⃣ NO CHANGES MESSAGE
+  ############################################
   skip-notification:
-    name: "No Changes Detected"
-    needs: [plan]
-    if: |
-      needs.plan.result == 'success' && 
-      needs.plan.outputs.has_changes == 'false' && 
-      inputs.Action == 'apply'
+    name: No Changes Detected
+    needs: plan
     runs-on: ubuntu-latest
-    steps:
-      - name: Notify no changes
-        run: |
-          echo "###########################################"
-          echo "#                                         #"
-          echo "#   ✅ No infrastructure changes detected  #"
-          echo "#   🚫 Terraform apply will be skipped     #"
-          echo "#                                         #"
-          echo "###########################################"
 
-  # Job 6: Cleanup (optional)
-  cleanup:
-    name: "Cleanup Artifacts"
-    needs: [apply-or-destroy, skip-notification]
-    if: always()
-    runs-on: ubuntu-latest
+    if: |
+      needs.plan.result == 'success' &&
+      needs.plan.outputs.has_changes == 'false' &&
+      inputs.Action == 'apply'
+
     steps:
-      - name: Cleanup old artifacts
-        run: |
-          echo "🧹 Cleaning up temporary artifacts..."
-          echo "✅ Artifacts with run_id: ${{ github.run_id }} for environment: ${{ inputs.environment }} will expire based on retention policy"
+      - run: |
+          echo "###########################################"
+          echo "#   ✅ No infrastructure changes detected  #"
+          echo "#   🚫 Terraform apply skipped             #"
+          echo "###########################################"
