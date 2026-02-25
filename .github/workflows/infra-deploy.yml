@@ -68,16 +68,26 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
       
-      - name: Create artifact directory
+      - name: Debug - Check working directory
         run: |
-          mkdir -p /tmp/terraform-artifacts
-          cp -r .terraform /tmp/terraform-artifacts/
+          echo "Current working directory: $(pwd)"
+          echo "Contents:"
+          ls -la
+          echo "Checking for .terraform folder:"
+          if [ -d ".terraform" ]; then
+            echo "✅ .terraform folder exists"
+            echo "Contents of .terraform:"
+            ls -la .terraform/
+          else
+            echo "❌ .terraform folder NOT found!"
+            exit 1
+          fi
       
       - name: Upload .terraform folder
         uses: actions/upload-artifact@v4
         with:
           name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
-          path: /tmp/terraform-artifacts/.terraform
+          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/.terraform
           retention-days: 1
           if-no-files-found: error
 
