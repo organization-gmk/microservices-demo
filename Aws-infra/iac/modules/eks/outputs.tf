@@ -1,6 +1,6 @@
 output "cluster_name" {
   description = "EKS cluster name"
-  value       = aws_eks_cluster.gmk_cluster.name
+  value       = aws_eks_cluster.gmk_cluster.id
 }
 
 output "cluster_arn" {

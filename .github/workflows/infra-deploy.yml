@@ -1,6 +1,7 @@
 name: Terraform Deployment Module
 
 on:
+    
   workflow_call:
     inputs:
       environment:
@@ -31,10 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     container:
-      image: krishna0011/awscli-tf-1.5:latest
-      credentials:
-        username: ${{ vars.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PAT }}
+      image: hashicorp/terraform:1.5.0
     defaults:
       run:
         working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
@@ -65,12 +63,6 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
-      - name: Remove broken Kubernetes ServiceAccount from state
-        run: |
-          echo "Removing module.eks.kubernetes_service_account_v1.aws_load_balancer_controller from Terraform state..."
-          terraform state rm module.eks.kubernetes_service_account_v1.aws_load_balancer_controller
-
-
       - name: Terraform Validate
         run: terraform validate
 
@@ -85,37 +77,6 @@ jobs:
         run: |
           export TF_LOG=INFO
           terraform plan -destroy -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
-
-      # Infracost only for apply action
-      # - name: Setup Infracost
-      #   if: steps.check_action.outputs.action == 'apply'
-      #   uses: infracost/actions/setup@v3
-      #   with:
-      #     api-key: ${{ secrets.INFRACOST_API_KEY }}
-
-      # - name: Convert Terraform Plan to JSON
-      #   if: steps.check_action.outputs.action == 'apply'
-      #   run: terraform show -json terraform.plan > plan.json
-
-      # - name: Generate Infracost Report
-      #   if: steps.check_action.outputs.action == 'apply'
-      #   run: |
-      #     # Display in pipeline console
-      #     echo "=== INFRASTRUCTURE COST ESTIMATE ==="
-      #     infracost breakdown --path plan.json --format table
-          
-      #     # Generate file for artifact
-      #     infracost breakdown --path plan.json --format html --out-file infracost-report.html
-      #     infracost breakdown --path plan.json --format json --out-file infracost-report.json
-
-      # - name: Upload Infracost Report
-      #   if: steps.check_action.outputs.action == 'apply'
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: infracost-report
-      #     path: |
-      #       infracost-report.html
-      #       infracost-report.json
 
       - name: Store plan
         uses: actions/upload-artifact@v4
@@ -139,5 +100,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state
-
           path: terraform_state.json
+
+      
+	  
