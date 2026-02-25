@@ -1,6 +1,7 @@
 name: Terraform Deployment Module
 
 on:
+    
   workflow_call:
     inputs:
       environment:
@@ -19,206 +20,90 @@ on:
         required: false
         type: string
         default: "apply"
+        description: "Terraform action to perform (apply or destroy)"
 
 permissions:
   contents: read
-  id-token: write
+  issues: write
 
 jobs:
-
-  ############################################
-  # 1️⃣ VALIDATE
-  ############################################
-  validate:
-    name: Terraform Validate
+  plan-and-apply-deployment:
+    name: "Terraform Init, Validate, Plan, Upload State, Apply/Destroy"
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-
-    container:
+    container: 
       image: krishna0011/awscli-tf-1.5:latest
       credentials:
         username: ${{ vars.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PAT }}
-
     defaults:
       run:
         working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
+    permissions:
+      id-token: write
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Terraform Init
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Action Type
+        id: check_action
         run: |
-          terraform init \
-            -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
+          if [ "${{ inputs.Action }}" = "destroy" ]; then
+            echo "action=destroy" >> $GITHUB_OUTPUT
+          else
+            echo "action=apply" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform Init (with backend config)
+        run: |
+          rm -rf .terraform
+          terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Terraform Plan for Apply
+        if: steps.check_action.outputs.action == 'apply'
+        run: |
+          export TF_LOG=INFO
+          terraform plan -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
 
-  ############################################
-  # 2️⃣ PLAN
-  ############################################
-  plan:
-    name: Terraform Plan (${{ inputs.Action }})
-    runs-on: ubuntu-latest
-    needs: validate
-    environment: ${{ inputs.environment }}
+      - name: Terraform Plan for Destroy
+        if: steps.check_action.outputs.action == 'destroy'
+        run: |
+          export TF_LOG=INFO
+          terraform plan -destroy -out terraform.plan -input=false -lock=false -var-file ${{ inputs.Terraform_Deployment_Configuration_File }}
 
-    container:
-      image: krishna0011/awscli-tf-1.5:latest
-      credentials:
-        username: ${{ vars.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PAT }}
-
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
-    outputs:
-      has_changes: ${{ steps.check.outputs.has_changes }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Store plan
+        uses: actions/upload-artifact@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          name: terraform-plan
+          path: terraform.plan
 
-      - name: Terraform Init
+      - name: Terraform Apply or Destroy
         run: |
-          terraform init \
-            -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
-
-      - name: Terraform Plan (Apply)
-        if: inputs.Action == 'apply'
-        run: |
-          terraform plan \
-            -out terraform.plan \
-            -input=false \
-            -var-file=${{ inputs.Terraform_Deployment_Configuration_File }}
-
-      - name: Terraform Plan (Destroy)
-        if: inputs.Action == 'destroy'
-        run: |
-          terraform plan \
-            -destroy \
-            -out terraform.plan \
-            -input=false \
-            -var-file=${{ inputs.Terraform_Deployment_Configuration_File }}
-
-      - name: Check if plan has changes
-        id: check
-        run: |
-          if terraform show -json terraform.plan | \
-            jq -e '.resource_changes[] | select(.change.actions != ["no-op"])' > /dev/null; then
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-              echo "✅ Changes detected"
+          if [ "${{ inputs.Action }}" = "destroy" ]; then
+            echo "Performing Terraform Destroy..."
+            terraform apply -auto-approve terraform.plan
           else
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-              echo "ℹ️ No changes detected"
+            echo "Performing Terraform Apply..."
+            terraform apply -auto-approve terraform.plan
+            terraform show -json > terraform_state.json
           fi
 
-      - name: Upload Terraform Plan
+      - name: Upload Terraform state JSON (for apply only)
+        if: steps.check_action.outputs.action == 'apply'
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/terraform.plan
-          retention-days: 1
+          name: terraform-state
+          path: terraform_state.json
 
-
-  ############################################
-  # 3️⃣ APPLY / DESTROY
-  ############################################
-  apply-or-destroy:
-    name: Terraform ${{ inputs.Action }}
-    runs-on: ubuntu-latest
-    needs: plan
-    environment: ${{ inputs.environment }}
-
-    if: |
-      needs.plan.result == 'success' &&
-      (needs.plan.outputs.has_changes == 'true' || inputs.Action == 'destroy')
-
-    container:
-      image: krishna0011/awscli-tf-1.5:latest
-      credentials:
-        username: ${{ vars.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PAT }}
-
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Terraform Init
-        run: |
-          terraform init \
-            -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
-
-      - name: Download Terraform Plan
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
-
-      - name: Verify Plan Exists
-        run: |
-          ls -la
-          if [ ! -f terraform.plan ]; then
-            echo "❌ terraform.plan not found"
-            exit 1
-          fi
-
-      - name: Terraform Apply / Destroy
-        run: |
-          terraform apply -auto-approve terraform.plan
-
-      - name: Export State JSON (apply only)
-        if: inputs.Action == 'apply'
-        run: terraform show -json > terraform_state.json
-
-      - name: Upload Terraform State JSON
-        if: inputs.Action == 'apply'
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-state-${{ github.run_id }}-${{ inputs.environment }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/terraform_state.json
-          retention-days: 30
-
-
-  ############################################
-  # 4️⃣ NO CHANGES MESSAGE
-  ############################################
-  skip-notification:
-    name: No Changes Detected
-    needs: plan
-    runs-on: ubuntu-latest
-
-    if: |
-      needs.plan.result == 'success' &&
-      needs.plan.outputs.has_changes == 'false' &&
-      inputs.Action == 'apply'
-
-    steps:
-      - run: |
-          echo "###########################################"
-          echo "#   ✅ No infrastructure changes detected  #"
-          echo "#   🚫 Terraform apply skipped             #"
-          echo "###########################################"
+      
+	  
