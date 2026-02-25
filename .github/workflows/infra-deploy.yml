@@ -1,7 +1,6 @@
 name: Terraform Deployment Module
 
 on:
-    
   workflow_call:
     inputs:
       environment:
@@ -104,6 +103,3 @@ jobs:
         with:
           name: terraform-state
           path: terraform_state.json
-
-      
-	  
