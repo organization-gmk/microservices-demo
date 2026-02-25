@@ -68,12 +68,18 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
       
-      - name: Save .terraform folder
+      - name: Create artifact directory
+        run: |
+          mkdir -p /tmp/terraform-artifacts
+          cp -r .terraform /tmp/terraform-artifacts/
+      
+      - name: Upload .terraform folder
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-init-${{ github.run_id }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/.terraform
+          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
+          path: /tmp/terraform-artifacts/.terraform
           retention-days: 1
+          if-no-files-found: error
 
   # Job 2: Validation
   validate:
@@ -105,8 +111,18 @@ jobs:
       - name: Download .terraform folder
         uses: actions/download-artifact@v4
         with:
-          name: terraform-init-${{ github.run_id }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/.terraform
+          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
+          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
+
+      - name: Verify .terraform folder
+        run: |
+          if [ -d ".terraform" ]; then
+            echo "✅ .terraform folder downloaded successfully"
+            ls -la .terraform/
+          else
+            echo "❌ .terraform folder not found"
+            exit 1
+          fi
 
       - name: Terraform Validate
         run: terraform validate
@@ -143,8 +159,17 @@ jobs:
       - name: Download .terraform folder
         uses: actions/download-artifact@v4
         with:
-          name: terraform-init-${{ github.run_id }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/.terraform
+          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
+          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
+
+      - name: Verify .terraform folder
+        run: |
+          if [ -d ".terraform" ]; then
+            echo "✅ .terraform folder downloaded successfully"
+          else
+            echo "❌ .terraform folder not found"
+            exit 1
+          fi
 
       - name: Terraform Plan for Apply
         if: inputs.Action == 'apply'
@@ -161,26 +186,33 @@ jobs:
       - name: Check if plan has changes
         id: check_plan_changes
         run: |
-          if terraform show -json terraform.plan | jq -e '.resource_changes[] | select(.change.actions != ["no-op"])' > /dev/null; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "✅ Terraform plan has changes that will be applied."
+          if [ -f "terraform.plan" ]; then
+            if terraform show -json terraform.plan | jq -e '.resource_changes[] | select(.change.actions != ["no-op"])' > /dev/null 2>&1; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "✅ Terraform plan has changes that will be applied."
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "ℹ️ No changes detected in Terraform plan."
+            fi
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No changes detected in Terraform plan."
+            echo "❌ terraform.plan file not found"
+            exit 1
           fi
 
-      - name: Store plan
+      - name: Upload terraform plan
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-plan-${{ github.run_id }}
+          name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
           path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/terraform.plan
           retention-days: 1
+          if-no-files-found: error
 
   # Job 4: Apply or Destroy
   apply-or-destroy:
     name: "Terraform ${{ inputs.Action }}"
     needs: [plan]
     if: |
+      always() &&
       needs.plan.result == 'success' && 
       (needs.plan.outputs.has_changes == 'true' || inputs.Action == 'destroy')
     runs-on: ubuntu-latest
@@ -209,14 +241,30 @@ jobs:
       - name: Download .terraform folder
         uses: actions/download-artifact@v4
         with:
-          name: terraform-init-${{ github.run_id }}
-          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}/.terraform
+          name: terraform-init-${{ github.run_id }}-${{ inputs.environment }}
+          path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
 
       - name: Download terraform plan
         uses: actions/download-artifact@v4
         with:
-          name: terraform-plan-${{ github.run_id }}
+          name: terraform-plan-${{ github.run_id }}-${{ inputs.environment }}
           path: ${{ github.workspace }}/${{ inputs.WORKING_DIR }}
+
+      - name: Verify artifacts
+        run: |
+          if [ -d ".terraform" ]; then
+            echo "✅ .terraform folder exists"
+          else
+            echo "❌ .terraform folder not found"
+            exit 1
+          fi
+          
+          if [ -f "terraform.plan" ]; then
+            echo "✅ terraform.plan file exists"
+          else
+            echo "❌ terraform.plan file not found"
+            exit 1
+          fi
 
       - name: Terraform Apply or Destroy
         run: |
@@ -235,5 +283,9 @@ jobs:
         if: inputs.Action == 'apply'
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-state-${{ github.run_id }}
+          name: terraform-state-${{ github.run_id }}-${{ inputs.environment }}
           path: terraform_state.json
+          retention-days: 30
+          if-no-files-found: warn
+
+ 
