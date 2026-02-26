@@ -335,3 +335,54 @@ resource "aws_iam_role_policy_attachment" "cw_observability" {
   role       = aws_iam_role.cw_observability.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
+
+#-------------Secrets-Policy-Least-Privilege------------------
+resource "aws_iam_policy" "patient_secrets_policy" {
+  name = "${var.name_prefix}-patient-secrets-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/App" = "patient"
+          }
+        }
+      }
+    ]
+  })
+}
+
+data "aws_iam_policy_document" "patient_irsa_assume_role" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.eks.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(var.oidc_provider_url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:prod:patient-sa"]
+    }
+  }
+}
+
+resource "aws_iam_role" "patient_irsa_role" {
+  name               = "${var.name_prefix}-patient-irsa-role"
+  assume_role_policy = data.aws_iam_policy_document.patient_irsa_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "patient_secrets_attach" {
+  role       = aws_iam_role.patient_irsa_role.name
+  policy_arn = aws_iam_policy.patient_secrets_policy.arn
+}

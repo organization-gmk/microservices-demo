@@ -83,3 +83,8 @@ variable "aws_load_balancer_controller_arn" {
   
 }
 
+variable "patient_irsa_role_arn" {
+  description = " "
+  type = string
+  
+}

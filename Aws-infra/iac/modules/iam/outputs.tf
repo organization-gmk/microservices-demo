@@ -35,3 +35,8 @@ output "cloudwatch_agent_role_arn" {
   description = "ARN of the IAM role for CloudWatch Agent & Fluent Bit"
   value       = aws_iam_role.cw_observability.arn
 }
+
+output "patient_irsa_arn" {
+  description = "Arn of patient irsa for least-privilege to acceess secrets-manager from eks "
+  value   = aws_iam_role.patient_irsa_role.arn
+}

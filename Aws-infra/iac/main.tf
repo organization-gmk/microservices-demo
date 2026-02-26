@@ -36,6 +36,7 @@ module "eks" {
   node_groups           = var.node_groups
   cloudwatch_agent_role = module.iam.cloudwatch_agent_role_arn
   aws_load_balancer_controller_arn = module.iam.aws_load_balancer_controller_arn
+  patient_irsa_role_arn   = module.iam.patient_irsa_arn
   
   tags                  = local.common_tags
 
