@@ -351,7 +351,7 @@ resource "aws_iam_policy" "patient_secrets_policy" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "aws:ResourceTag/App" = "patient"
+            "aws:ResourceTag/App" = "patient-service"
           }
         }
       }
@@ -372,7 +372,7 @@ data "aws_iam_policy_document" "patient_irsa_assume_role" {
     condition {
       test     = "StringEquals"
       variable = "${replace(var.oidc_provider_url, "https://", "")}:sub"
-      values   = ["system:serviceaccount:prod:patient-sa"]
+      values   = ["system:serviceaccount:patient-service:patient-sa"]
     }
   }
 }

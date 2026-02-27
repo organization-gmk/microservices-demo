@@ -132,10 +132,17 @@ resource "kubernetes_service_account_v1" "aws_load_balancer_controller" {
   }
 }
 
+resource "kubernetes_namespace" "app_namespace" {
+  metadata {
+    name = "patient-service"
+  }
+}
+
+
 resource "kubernetes_service_account_v1" "patient_service_account" {
   metadata {
     name      = "patient-sa"
-    namespace = "prod"
+    namespace = "patient-service"
 
     annotations = {
       "eks.amazonaws.com/role-arn" = var.patient_irsa_role_arn
