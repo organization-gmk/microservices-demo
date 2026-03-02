@@ -65,10 +65,7 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
-      - name: Remove broken Kubernetes Namespace from state
-        run: |
-          echo "Removing module.eks.kubernetes_namespace.app_namespace from Terraform state..."
-          terraform state rm module.eks.kubernetes_namespace.app_namespace
+      
 
       - name: Terraform Validate
         run: terraform validate

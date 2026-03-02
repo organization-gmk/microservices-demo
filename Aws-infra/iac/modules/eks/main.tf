@@ -136,6 +136,7 @@ resource "kubernetes_namespace" "app_namespace" {
   metadata {
     name = "patient-service"
   }
+  depends_on = [module.eks]
 }
 
 
