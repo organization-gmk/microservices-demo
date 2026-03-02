@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: billing-service
-  namespace: microservices
+  namespace: patient-service
 spec:
   replicas: 1
   selector:
