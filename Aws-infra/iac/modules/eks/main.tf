@@ -132,11 +132,10 @@ resource "kubernetes_service_account_v1" "aws_load_balancer_controller" {
   }
 }
 
-resource "kubernetes_namespace" "app_namespace" {
+resource "kubernetes_namespace_v1" "app_namespace" {
   metadata {
     name = "patient-service"
   }
-  depends_on = [module.eks]
 }
 
 
