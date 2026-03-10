@@ -41,7 +41,11 @@ output "patient_irsa_arn" {
   value   = aws_iam_role.patient_irsa_role.arn
 }
 
-
+output "csi_secrets_driver_role_arn" {
+  description = "Arn of the IAM role for Secrets Store CSI Driver"
+  value       = aws_iam_role.csi_secrets_driver_role.arn
+  
+}
 
 
 output "auth_service_role_arn" {

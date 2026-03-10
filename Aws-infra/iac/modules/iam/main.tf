@@ -496,7 +496,6 @@ resource "aws_iam_role" "irsa_roles" {
   
   name               = "${var.name_prefix}-${each.key}-role"
   assume_role_policy = data.aws_iam_policy_document.irsa_assume_role[each.key].json
-  require_session_tags = true
   
   tags = merge(var.tags, {
     Service  = each.value.service_tag
