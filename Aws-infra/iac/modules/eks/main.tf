@@ -89,7 +89,7 @@ resource "aws_launch_template" "node_group" {
   }
 }
 
-#--------------EBS CSI Driver IAM Role----------------
+#--------------EBS CSI Driver ----------------
 resource "aws_eks_addon" "ebs_csi_driver" {
   cluster_name             = aws_eks_cluster.gmk_cluster.name
   addon_name               = "aws-ebs-csi-driver"
@@ -105,6 +105,28 @@ resource "aws_eks_addon" "ebs_csi_driver" {
     aws_eks_node_group.gmk_node_group
   ]
 }
+
+#--------------Secrets CSI Driver----------------
+# Secrets Store CSI Driver Addon
+resource "aws_eks_addon" "secrets_store_csi" {
+  cluster_name             = aws_eks_cluster.gmk_cluster.name
+  addon_name               = "aws-secrets-store-csi-driver-provider"
+  addon_version            = "v1.5.6-eksbuild.1"  
+  
+ 
+  service_account_role_arn = var.csi_secrets_driver_role_arn
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  tags = var.tags
+
+  depends_on = [
+    aws_eks_node_group.gmk_node_group
+  ]
+}
+
+
+
 #--------------ClowdWatch Agent & Fluent Bit----------------
 resource "aws_eks_addon" "cloudwatch_observability" {
   cluster_name             = aws_eks_cluster.gmk_cluster.name
@@ -148,4 +170,76 @@ resource "kubernetes_service_account_v1" "patient_service_account" {
       "eks.amazonaws.com/role-arn" = var.patient_irsa_role_arn
     }
   }
+}
+
+
+# ------------- Auth Service Account -------------
+resource "kubernetes_service_account_v1" "auth_service" {
+  metadata {
+    name      = "auth-service-sa"
+    namespace = kubernetes_namespace_v1.patient_service.metadata[0].name
+
+    annotations = {
+      "eks.amazonaws.com/role-arn"                 = var.auth_service_role_arn
+      "eks.amazonaws.com/sts-regional-endpoints"   = "true"
+      "eks.amazonaws.com/tags"                      = jsonencode({
+        Service     = "auth"
+        Environment = var.tags["Environment"]
+      })
+    }
+
+    labels = {
+      service     = "auth"
+      Environment = var.tags["Environment"]
+    }
+  }
+
+}
+
+# ------------- Patient Service Account -------------
+resource "kubernetes_service_account_v1" "patient_service" {
+  metadata {
+    name      = "patient-service-sa"
+    namespace = kubernetes_namespace_v1.patient_service.metadata[0].name
+
+    annotations = {
+      "eks.amazonaws.com/role-arn"                 = var.patient_service_role_arn
+      "eks.amazonaws.com/sts-regional-endpoints"   = "true"
+      "eks.amazonaws.com/tags"                      = jsonencode({
+        Service     = "patient"
+        Environment = var.tags["Environment"] 
+      })
+    }
+
+    labels = {
+      service     = "patient"
+      Environment = var.tags["Environment"] 
+    }
+  }
+
+ 
+}
+
+# ------------- API Gateway Service Account -------------
+resource "kubernetes_service_account_v1" "api_gateway_service" {
+  metadata {
+    name      = "api-gateway-sa"
+    namespace = kubernetes_namespace_v1.patient_service.metadata[0].name
+
+    annotations = {
+      "eks.amazonaws.com/role-arn"                 = var.api_gateway_role_arn
+      "eks.amazonaws.com/sts-regional-endpoints"   = "true"
+      "eks.amazonaws.com/tags"                      = jsonencode({
+        Service     = "apigateway"
+        Environment = var.tags["Environment"] 
+      })
+    }
+
+    labels = {
+      service     = "apigateway"
+      Environment = var.tags["Environment"]
+    }
+  }
+
+
 }

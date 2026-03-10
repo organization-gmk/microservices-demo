@@ -88,3 +88,25 @@ variable "patient_irsa_role_arn" {
   type = string
   
 }
+
+variable "csi_secrets_driver_role_arn" {
+  description = "Secrets csi driver role arn from iam"
+  
+  
+}
+
+variable "auth_service_role_arn" {
+  description = "Auth Service Role ARN"
+  type = string
+}
+
+variable "patient_service_role_arn" {
+  description = "Patient Service Role ARN"
+  type = string
+}
+
+variable "api_gateway_role_arn" {
+  description = "API Gateway Role ARN"
+  type = string
+  
+}

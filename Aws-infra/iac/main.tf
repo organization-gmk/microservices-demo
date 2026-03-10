@@ -37,8 +37,20 @@ module "eks" {
   cloudwatch_agent_role = module.iam.cloudwatch_agent_role_arn
   aws_load_balancer_controller_arn = module.iam.aws_load_balancer_controller_arn
   patient_irsa_role_arn   = module.iam.patient_irsa_arn
+  csi_secrets_driver_role_arn = module.iam.csi_secrets_driver_role_arn
+  auth_service_role_arn = module.iam.auth_service_role_arn
+  patient_service_role_arn = module.iam.patient_service_role_arn
+  api_gateway_role_arn = module.iam.api_gateway_role_arn
   
   tags                  = local.common_tags
 
  
+}
+
+module "secrets" {
+  source = "./modules/secrets-mgr"
+
+   name_prefix = local.name_prefix
+   tags                  = local.common_tags
+
 }

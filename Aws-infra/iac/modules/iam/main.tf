@@ -165,18 +165,18 @@ resource "aws_iam_role_policy_attachment" "ebs_csi_driver_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
-data "tls_certificate" "oidc" {
-  
-  url   = var.oidc_provider_url
-}
 
+##################OIDC-EKS#######################################################
 resource "aws_iam_openid_connect_provider" "eks" {
 
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.oidc.certificates[0].sha1_fingerprint]
   url             = var.oidc_provider_url
 }
-
+data "tls_certificate" "oidc" {
+  
+  url   = var.oidc_provider_url
+}
 ###############################################################################################
 # IAM Role for RDS Monitoring
 resource "aws_iam_role" "rds_monitoring" {
@@ -336,7 +336,64 @@ resource "aws_iam_role_policy_attachment" "cw_observability" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
-#-------------Secrets-Policy-Least-Privilege------------------
+########################Secrets-CSI-DRIVER-POLICY#####################################################
+resource "aws_iam_role" "secrets_store_csi_driver_role" {
+  name = "${var.name_prefix}-secrets-store-csi-driver-role"
+  
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn 
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(var.oidc_provider_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:secrets-store-csi-driver-sa"
+            "${replace(var.oidc_provider_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, {
+    Service = "csi-driver"
+    RoleType = "addon"
+  })
+}
+
+# Minimal policy for CSI driver to operate (NO secret access!)
+resource "aws_iam_policy" "secrets_store_csi_driver_policy" {
+  name        = "${var.name_prefix}-secrets-store-csi-driver-policy"
+  description = "Minimal policy for Secrets Store CSI driver to operate"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster"
+        ]
+        Resource = "*"
+      }
+      
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "secrets_store_csi_driver_attach" {
+  role       = aws_iam_role.secrets_store_csi_driver_role.name
+  policy_arn = aws_iam_policy.secrets_store_csi_driver_policy.arn
+}
+
+
+
+#############PATIENT-NAMESPACE-IRSA-ROLE############################
 resource "aws_iam_policy" "patient_secrets_policy" {
   name = "${var.name_prefix}-patient-secrets-policy"
 
@@ -358,6 +415,7 @@ resource "aws_iam_policy" "patient_secrets_policy" {
     ]
   })
 }
+
 
 data "aws_iam_policy_document" "patient_irsa_assume_role" {
   statement {
@@ -385,4 +443,112 @@ resource "aws_iam_role" "patient_irsa_role" {
 resource "aws_iam_role_policy_attachment" "patient_secrets_attach" {
   role       = aws_iam_role.patient_irsa_role.name
   policy_arn = aws_iam_policy.patient_secrets_policy.arn
+}
+##############################################################################################
+# IRSA ASSUME ROLE POLICY MODULE - ONE FOR EACH SERVICE ACCOUNT
+##############################################################################################
+locals {
+  oidc_sub_prefix = replace(var.oidc_provider_url, "https://", "")
+}
+
+# ABAC Policy - allows access only if tags match
+resource "aws_iam_policy" "abac_secrets_policy" {
+  name        = "${var.name_prefix}-abac-secrets-policy"
+  description = "ABAC policy for secrets access based on tags"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAccessBasedOnTags"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Service"     = "$${aws:PrincipalTag/Service}"
+            "aws:ResourceTag/Environment" = "$${aws:PrincipalTag/Environment}"
+          }
+        }
+      },
+      {
+        Sid    = "DenyCrossEnvironmentAccess"
+        Effect = "Deny"
+        Action = "secretsmanager:GetSecretValue"
+        Resource = "*"
+        Condition = {
+          StringNotEquals = {
+            "aws:ResourceTag/Environment" = "$${aws:PrincipalTag/Environment}"
+          }
+        }
+      }
+    ]
+  })
+}
+
+
+# Single module for all IRSA roles
+resource "aws_iam_role" "irsa_roles" {
+  for_each = var.service_accounts
+  
+  name               = "${var.name_prefix}-${each.key}-role"
+  assume_role_policy = data.aws_iam_policy_document.irsa_assume_role[each.key].json
+  require_session_tags = true
+  
+  tags = merge(var.tags, {
+    Service  = each.value.service_tag
+    RoleType = "irsa"
+  })
+}
+
+# Dynamic assume role policies
+data "aws_iam_policy_document" "irsa_assume_role" {
+  for_each = var.service_accounts
+  
+  statement {
+    effect  = "Allow"
+    actions = [
+      "sts:AssumeRoleWithWebIdentity",
+      "sts:TagSession"
+    ]
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.eks.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_sub_prefix}:sub"
+      values   = ["system:serviceaccount:${each.value.namespace}:${each.value.service_account}"]
+    }
+    
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_sub_prefix}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    
+    condition {
+      test     = "StringEquals"
+      variable = "sts:RequestTag/Environment"
+      values   = [lookup(var.tags, "Environment", "dev")]
+    }
+    
+    condition {
+      test     = "StringEquals"
+      variable = "sts:RequestTag/Service"
+      values   = [each.value.service_tag]
+    }
+  }
+}
+
+# Attach ABAC policy to all roles
+resource "aws_iam_role_policy_attachment" "abac_attach" {
+  for_each   = var.service_accounts
+  role       = aws_iam_role.irsa_roles[each.key].name
+  policy_arn = aws_iam_policy.abac_secrets_policy.arn
 }

@@ -40,3 +40,18 @@ output "patient_irsa_arn" {
   description = "Arn of patient irsa for least-privilege to acceess secrets-manager from eks "
   value   = aws_iam_role.patient_irsa_role.arn
 }
+
+
+
+
+output "auth_service_role_arn" {
+  value = aws_iam_role.irsa_roles["auth"].arn
+}
+
+output "patient_service_role_arn" {
+  value = aws_iam_role.irsa_roles["patient"].arn
+}
+
+output "api_gateway_role_arn" {
+  value = aws_iam_role.irsa_roles["api-gateway"].arn
+}
