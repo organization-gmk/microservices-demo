@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: patient-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/auth-service:V0.1.0
+        ports:
+        - containerPort: 4005
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://auth-db:5432/authdb"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "authuser"
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-db-secret
+              key: POSTGRES_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            configMapKeyRef:
+              name: api-gateway-config
+              key: jwt.secret
+        - name: JWT_EXPIRATION
+          value: "86400000"
+        - name: SERVER_PORT
+          value: "4005"
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: "update"
+        - name: SPRING_SQL_INIT_MODE
+          value: "always"
+        - name: SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION
+          value: "true"
+        - name: SPRING_SQL_INIT_DATA_LOCATIONS
+          value: "classpath:data.sql"
+        - name: SPRING_SQL_INIT_CONTINUE_ON_ERROR
+          value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: patient-service
+spec:
+  selector:
+    app: auth-service
+  ports:
+  - port: 4005
+    targetPort: 4005:q

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: patient-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/analytics-service:V0.0.1
+        ports:
+        - containerPort: 4006
+        env:
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          value: "gkn-kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        - name: SERVER_PORT
+          value: "4006"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: patient-service
+spec:
+  selector:
+    app: analytics-service
+  ports:
+  - port: 4006
+    targetPort: 4006

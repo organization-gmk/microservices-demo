@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: auth-db
+  namespace: patient-service
+spec:
+  serviceName: auth-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-db
+  template:
+    metadata:
+      labels:
+        app: auth-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - secretRef:
+            name: auth-db-secret
+        volumeMounts:
+        - name: data  # Changed from 'pgdata' to 'data'
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+      # REMOVE the volumes section entirely - StatefulSets don't use this with volumeClaimTemplates!
+  volumeClaimTemplates:
+  - metadata:
+      name: data  # This creates PVC named "data-auth-db-0"
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: gp2
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-db-secret
+  namespace: patient-service
+type: Opaque
+stringData:
+  POSTGRES_DB: authdb
+  POSTGRES_USER: authuser
+  POSTGRES_PASSWORD: authpassword
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-db
+  namespace: patient-service
+spec:
+  selector:
+    app: auth-db
+  ports:
+  - port: 5432
+    targetPort: 5432
