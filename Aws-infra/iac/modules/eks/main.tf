@@ -177,7 +177,7 @@ resource "kubernetes_service_account_v1" "patient_service_account" {
 resource "kubernetes_service_account_v1" "auth_service" {
   metadata {
     name      = "auth-service-sa"
-    namespace = kubernetes_namespace_v1.patient_service.metadata[0].name
+    namespace = kubernetes_service_account_v1.patient_service_account.name
 
     annotations = {
       "eks.amazonaws.com/role-arn"                 = var.auth_service_role_arn
@@ -200,7 +200,7 @@ resource "kubernetes_service_account_v1" "auth_service" {
 resource "kubernetes_service_account_v1" "patient_service" {
   metadata {
     name      = "patient-service-sa"
-    namespace = kubernetes_namespace_v1.patient_service.metadata[0].name
+    namespace = kubernetes_service_account_v1.patient_service_account.name
 
     annotations = {
       "eks.amazonaws.com/role-arn"                 = var.patient_service_role_arn
@@ -224,7 +224,7 @@ resource "kubernetes_service_account_v1" "patient_service" {
 resource "kubernetes_service_account_v1" "api_gateway_service" {
   metadata {
     name      = "api-gateway-sa"
-    namespace = kubernetes_namespace_v1.patient_service.metadata[0].name
+    namespace = kkubernetes_service_account_v1.patient_service_account.name
 
     annotations = {
       "eks.amazonaws.com/role-arn"                 = var.api_gateway_role_arn
