@@ -51,6 +51,7 @@ module "secrets" {
   source = "./modules/secrets-mgr"
 
    name_prefix = local.name_prefix
+   aws_region = var.aws_region
    tags                  = local.common_tags
 
 }
