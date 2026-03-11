@@ -87,6 +87,6 @@ resource "aws_lambda_permission" "secrets_manager" {
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda"
+  source_dir  = "${path.module}/lambda/index.py"
   output_path = "${path.module}/lambda-rotation.zip"
 }
