@@ -108,22 +108,17 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 
 #--------------Secrets CSI Driver----------------
 # Secrets Store CSI Driver Addon
-resource "aws_eks_addon" "secrets_store_csi" {
-  cluster_name             = aws_eks_cluster.gmk_cluster.name
-  addon_name               = "secrets-store-csi-driver"
+
+resource "aws_eks_addon" "secrets_store_csi_provider" {
+  cluster_name = var.cluster_name
+  addon_name   = "aws-secrets-store-csi-driver-provider"  # 👈 This is the PROVIDER
+  addon_version = "v2.2.2-eksbuild.1"  # Compatible with 1.33
   
- 
-  service_account_role_arn = var.csi_secrets_driver_role_arn
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
-
+  
   tags = var.tags
-
-  depends_on = [
-    aws_eks_node_group.gmk_node_group
-  ]
 }
-
 
 
 #--------------ClowdWatch Agent & Fluent Bit----------------
