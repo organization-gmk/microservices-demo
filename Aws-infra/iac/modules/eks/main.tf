@@ -111,7 +111,6 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 resource "aws_eks_addon" "secrets_store_csi" {
   cluster_name             = aws_eks_cluster.gmk_cluster.name
   addon_name               = "aws-secrets-store-csi-driver-provider"
-  addon_version            = "v1.5.6-eksbuild.1"  
   
  
   service_account_role_arn = var.csi_secrets_driver_role_arn

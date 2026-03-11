@@ -1,4 +1,4 @@
-name: DB Services CI/CD
+name: Micro Services CI/CD
 
 on:
   push:

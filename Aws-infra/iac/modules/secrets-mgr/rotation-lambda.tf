@@ -22,13 +22,14 @@ resource "aws_iam_role" "rotation_lambda_role" {
 
 # Lambda function
 resource "aws_lambda_function" "secret_rotation" {
-  filename      = "lambda-rotation.zip"
+  filename      = "${path.module}/lambda-rotation.zip"
   function_name = "${var.name_prefix}-secret-rotation"
   role          = aws_iam_role.rotation_lambda_role.arn
   handler       = "rotation.lambda_handler"
   runtime       = "python3.9"
   timeout       = 300
   memory_size   = 128
+  source_code_hash = fileexists("${path.module}/lambda-rotation.zip") ? filebase64sha256("${path.module}/lambda-rotation.zip") : null
 
   environment {
     variables = {
