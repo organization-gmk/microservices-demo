@@ -22,14 +22,15 @@ resource "aws_iam_role" "rotation_lambda_role" {
 
 # Lambda function
 resource "aws_lambda_function" "secret_rotation" {
-  filename      = "${path.module}/lambda-rotation.zip"
   function_name = "${var.name_prefix}-secret-rotation"
   role          = aws_iam_role.rotation_lambda_role.arn
-  handler       = "rotation.lambda_handler"
+  handler       = "index.handler"
   runtime       = "python3.9"
   timeout       = 300
   memory_size   = 128
-  source_code_hash = fileexists("${path.module}/lambda-rotation.zip") ? filebase64sha256("${path.module}/lambda-rotation.zip") : null
+
+  filename      = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
@@ -81,4 +82,11 @@ resource "aws_lambda_permission" "secrets_manager" {
   function_name = aws_lambda_function.secret_rotation.function_name
   principal     = "secretsmanager.amazonaws.com"
   source_arn    = each.value.arn  
+}
+
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda"
+  output_path = "${path.module}/lambda-rotation.zip"
 }
