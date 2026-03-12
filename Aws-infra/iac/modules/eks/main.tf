@@ -109,16 +109,16 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 #--------------Secrets CSI Driver----------------
 # Secrets Store CSI Driver Addon
 
-resource "aws_eks_addon" "secrets_store_csi_provider" {
-  cluster_name = var.cluster_name
-  addon_name   = "aws-secrets-store-csi-driver-provider"  # 👈 This is the PROVIDER
-  addon_version = "v2.2.2-eksbuild.1"  # Compatible with 1.33
+# resource "aws_eks_addon" "secrets_store_csi_provider" {
+#   cluster_name = var.cluster_name
+#   addon_name   = "aws-secrets-store-csi-driver-provider"  # 👈 This is the PROVIDER
+#   addon_version = "v2.2.2-eksbuild.1"  # Compatible with 1.33
   
-  resolve_conflicts_on_create = "OVERWRITE"
-  resolve_conflicts_on_update = "OVERWRITE"
+#   resolve_conflicts_on_create = "OVERWRITE"
+#   resolve_conflicts_on_update = "OVERWRITE"
   
-  tags = var.tags
-}
+#   tags = var.tags
+# }
 
 
 #--------------ClowdWatch Agent & Fluent Bit----------------
