@@ -13,6 +13,7 @@ spec:
       labels:
         app: auth-service
     spec:
+      serviceAccountName: auth-service-sa
       containers:
       - name: auth-service
         image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/auth-service:V0.1.0
@@ -20,18 +21,26 @@ spec:
         - containerPort: 4005
         env:
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:postgresql://auth-db:5432/authdb"
+          value: "jdbc:postgresql://auth-db:5432/$(DB_NAME)"
         - name: SPRING_DATASOURCE_USERNAME
-          value: "authuser"
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_USER
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: auth-db-secret
+              name: auth-service-secrets
               key: POSTGRES_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_DB
         - name: JWT_SECRET
           valueFrom:
-            configMapKeyRef:
-              name: api-gateway-config
+            secretKeyRef:
+              name: auth-service-secrets
               key: jwt.secret
         - name: JWT_EXPIRATION
           value: "86400000"
@@ -47,7 +56,41 @@ spec:
           value: "classpath:data.sql"
         - name: SPRING_SQL_INIT_CONTINUE_ON_ERROR
           value: "true"
+        - name: AWS_REGION
+          value: "us-east-2"
+        volumeMounts:
+        - name: secrets-store
+          mountPath: /mnt/secrets
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 4005
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 4005
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: auth-service-secrets
+
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -58,4 +101,4 @@ spec:
     app: auth-service
   ports:
   - port: 4005
-    targetPort: 4005:q
+    targetPort: 4005

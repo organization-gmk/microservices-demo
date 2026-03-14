@@ -106,20 +106,6 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   ]
 }
 
-#--------------Secrets CSI Driver----------------
-# Secrets Store CSI Driver Addon
-
-# resource "aws_eks_addon" "secrets_store_csi_provider" {
-#   cluster_name = var.cluster_name
-#   addon_name   = "aws-secrets-store-csi-driver-provider"  # 👈 This is the PROVIDER
-#   addon_version = "v2.2.2-eksbuild.1"  # Compatible with 1.33
-  
-#   resolve_conflicts_on_create = "OVERWRITE"
-#   resolve_conflicts_on_update = "OVERWRITE"
-  
-#   tags = var.tags
-# }
-
 
 #--------------ClowdWatch Agent & Fluent Bit----------------
 resource "aws_eks_addon" "cloudwatch_observability" {
@@ -154,17 +140,6 @@ resource "kubernetes_namespace_v1" "app_namespace" {
   }
 }
 
-
-resource "kubernetes_service_account_v1" "patient_service_account" {
-  metadata {
-    name      = "patient-sa"
-    namespace = "patient-service"
-
-    annotations = {
-      "eks.amazonaws.com/role-arn" = var.patient_irsa_role_arn
-    }
-  }
-}
 
 
 # ------------- Auth Service Account -------------

@@ -36,16 +36,6 @@ output "cloudwatch_agent_role_arn" {
   value       = aws_iam_role.cw_observability.arn
 }
 
-output "patient_irsa_arn" {
-  description = "Arn of patient irsa for least-privilege to acceess secrets-manager from eks "
-  value   = aws_iam_role.patient_irsa_role.arn
-}
-
-output "csi_secrets_driver_role_arn" {
-  description = "Arn of the IAM role for Secrets Store CSI Driver"
-  value       = aws_iam_role.secrets_store_csi_driver_role.arn
-  
-}
 
 
 output "auth_service_role_arn" {

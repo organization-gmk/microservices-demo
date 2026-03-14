@@ -15,6 +15,7 @@ spec:
       labels:
         app: api-gateway
     spec:
+      serviceAccountName: api-gateway-sa
       containers:
       - name: api-gateway
         image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/api-gateway:latest
@@ -27,21 +28,22 @@ spec:
           value: "prod"
         - name: JWT_SECRET
           valueFrom:
-            configMapKeyRef:
-              name: api-gateway-config
+            secretKeyRef:
+              name: api-gateway-secrets
               key: jwt.secret
-        # This ensures the property is available even if file mount has issues
         - name: auth.service.url
-          valueFrom:
-            configMapKeyRef:
-              name: api-gateway-config
-              key: auth.service.url
+          value: "http://auth-service.patient-service.svc.cluster.local:4005"
+        - name: AWS_REGION
+          value: "us-east-2"
         volumeMounts:
         - name: config
           mountPath: /app/config
         - name: config
           mountPath: /app/BOOT-INF/classes/application-prod.yml
           subPath: application-prod.yml
+        - name: secrets-store
+          mountPath: /mnt/secrets
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -65,6 +67,12 @@ spec:
       - name: config
         configMap:
           name: api-gateway-config
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: api-gateway-secrets
 ---
 apiVersion: v1
 kind: Service

@@ -19,17 +19,29 @@ spec:
         image: postgres:15
         ports:
         - containerPort: 5432
-        envFrom:
-        - secretRef:
-            name: auth-db-secret
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_PASSWORD
         volumeMounts:
-        - name: data  # Changed from 'pgdata' to 'data'
+        - name: data
           mountPath: /var/lib/postgresql/data
           subPath: postgres
-      # REMOVE the volumes section entirely - StatefulSets don't use this with volumeClaimTemplates!
   volumeClaimTemplates:
   - metadata:
-      name: data  # This creates PVC named "data-auth-db-0"
+      name: data
     spec:
       accessModes: ["ReadWriteOnce"]
       storageClassName: gp2
@@ -38,17 +50,7 @@ spec:
           storage: 5Gi
 
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: auth-db-secret
-  namespace: patient-service
-type: Opaque
-stringData:
-  POSTGRES_DB: authdb
-  POSTGRES_USER: authuser
-  POSTGRES_PASSWORD: authpassword
----
+# Auth Database Service
 apiVersion: v1
 kind: Service
 metadata:

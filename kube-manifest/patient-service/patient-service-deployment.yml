@@ -15,6 +15,7 @@ spec:
       labels:
         app: patient-service
     spec:
+      serviceAccountName: patient-service-sa
       containers:
       - name: patient-service
         image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/patient-service:V0.0.1
@@ -26,20 +27,31 @@ spec:
           name: debug
         env:
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:postgresql://patient-service-db:5432/db"
+          value: "jdbc:postgresql://patient-service-db:5432/$(DB_NAME)"
         - name: SPRING_DATASOURCE_USERNAME
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
+              name: patient-service-secrets
               key: POSTGRES_USER
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
+              name: patient-service-secrets
               key: POSTGRES_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: patient-service-secrets
+              key: POSTGRES_DB
+        - name: AWS_REGION
+          value: "us-east-2"
         envFrom:
         - configMapRef:
             name: patient-service-config
+        volumeMounts:
+        - name: secrets-store
+          mountPath: /mnt/secrets
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -49,20 +61,28 @@ spec:
             cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /patients
+            path: /actuator/health
             port: 4000
-          initialDelaySeconds: 90   
+          initialDelaySeconds: 90
           periodSeconds: 10
-          failureThreshold: 3        
+          failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /patients
+            path: /actuator/health/readiness
             port: 4000
-          initialDelaySeconds: 70    
+          initialDelaySeconds: 70
           periodSeconds: 5
-          failureThreshold: 3        
+          failureThreshold: 3
+      volumes:
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: patient-service-secrets
 
 ---
+# Horizontal Pod Autoscaler
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -82,3 +102,24 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  namespace: patient-service
+  labels:
+    app: patient-service
+spec:
+  type: ClusterIP
+  selector:
+    app: patient-service
+  ports:
+  - name: http
+    port: 4000
+    targetPort: 4000
+  - name: debug
+    port: 5005
+    targetPort: 5005

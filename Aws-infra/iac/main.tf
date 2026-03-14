@@ -30,13 +30,11 @@ module "eks" {
   cluster_sg_id         = module.vpc.cluster_sg_id
   cluster_log_types     = var.cluster_log_types
   ebs_csi_driver_role   = module.iam.ebs_csi_driver_role_arn
-  
   ebs_addon_version     = var.ebs_addon_version
   node_iam_role_arn     = module.iam.node_iam_role_arn
   node_groups           = var.node_groups
   cloudwatch_agent_role = module.iam.cloudwatch_agent_role_arn
   aws_load_balancer_controller_arn = module.iam.aws_load_balancer_controller_arn
-  patient_irsa_role_arn   = module.iam.patient_irsa_arn
   csi_secrets_driver_role_arn = module.iam.csi_secrets_driver_role_arn
   auth_service_role_arn = module.iam.auth_service_role_arn
   patient_service_role_arn = module.iam.patient_service_role_arn
