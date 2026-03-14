@@ -28,9 +28,8 @@ spec:
           value: "prod"
         - name: JWT_SECRET
           valueFrom:
-            secretKeyRef:
-              name: api-gateway-secrets
-              key: jwt.secret
+        - name: JWT_SECRET_PATH
+          value: "/mnt/secrets/JWT_SECRET"
         - name: auth.service.url
           value: "http://auth-service.patient-service.svc.cluster.local:4005"
         - name: AWS_REGION

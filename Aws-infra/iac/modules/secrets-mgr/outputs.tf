@@ -1,28 +1,27 @@
-# Detailed map of all secrets
-output "secret_names" {
-  description = "Detailed map of secret keys with name and ARN"
-  value = {
-    for k, secret in aws_secretsmanager_secret.secrets : k => {
-      name = secret.name
-      arn  = secret.arn
-      id   = secret.id
-    }
-  }
-}
-
-# Simple ARN map (most commonly used)
 output "secret_arns" {
-  description = "Map of secret keys to ARNs"
   value = {
-    for k, secret in aws_secretsmanager_secret.secrets : k => secret.arn
+    auth_jwt    = data.aws_secretsmanager_secret.auth_jwt.arn
+    auth_db     = data.aws_secretsmanager_secret.auth_db.arn
+    patient_db  = data.aws_secretsmanager_secret.patient_db.arn
+    api_gateway = data.aws_secretsmanager_secret.api_gateway_jwt.arn
   }
 }
 
-# Secret IDs map
+output "secret_names" {
+  value = {
+    auth_jwt    = data.aws_secretsmanager_secret.auth_jwt.name
+    auth_db     = data.aws_secretsmanager_secret.auth_db.name
+    patient_db  = data.aws_secretsmanager_secret.patient_db.name
+    api_gateway = data.aws_secretsmanager_secret.api_gateway_jwt.name
+  }
+}
 output "secret_ids" {
   description = "Map of secret keys to IDs"
   value = {
-    for k, secret in aws_secretsmanager_secret.secrets : k => secret.id
+    auth_jwt    = data.aws_secretsmanager_secret.auth_jwt.id
+    auth_db     = data.aws_secretsmanager_secret.auth_db.id
+    patient_db  = data.aws_secretsmanager_secret.patient_db.id
+    api_gateway = data.aws_secretsmanager_secret.api_gateway_jwt.id
   }
 }
 
@@ -32,20 +31,20 @@ output "auth_jwt_secret_arn" {
   value       = aws_secretsmanager_secret.secrets["auth_jwt"].arn
 }
 
-output "auth_db_secret_arn" {
-  description = "ARN of auth service database credentials"
-  value       = aws_secretsmanager_secret.secrets["auth_db"].arn
-}
+# output "auth_db_secret_arn" {
+#   description = "ARN of auth service database credentials"
+#   value       = aws_secretsmanager_secret.secrets["auth_db"].arn
+# }
 
-output "patient_db_secret_arn" {
-  description = "ARN of patient service database credentials"
-  value       = aws_secretsmanager_secret.secrets["patient_db"].arn
-}
+# output "patient_db_secret_arn" {
+#   description = "ARN of patient service database credentials"
+#   value       = aws_secretsmanager_secret.secrets["patient_db"].arn
+# }
 
-output "api_gateway_jwt_secret_arn" {
-  description = "ARN of API Gateway JWT secret"
-  value       = aws_secretsmanager_secret.secrets["api_gateway_jwt"].arn
-}
+# output "api_gateway_jwt_secret_arn" {
+#   description = "ARN of API Gateway JWT secret"
+#   value       = aws_secretsmanager_secret.secrets["api_gateway_jwt"].arn
+# }
 
 # Lambda outputs
 output "rotation_lambda_arn" {
@@ -58,14 +57,34 @@ output "rotation_lambda_role_arn" {
   value       = aws_iam_role.rotation_lambda_role.arn
 }
 
-# Mapping of original names to actual names (helpful for reference)
-output "original_name_mapping" {
-  description = "Mapping of original secret names to actual names with timestamps"
-  value = {
-    for k, secret in aws_secretsmanager_secret.secrets : k => {
-      original_name = var.secrets[k].name
-      actual_name   = secret.name
-      arn          = secret.arn
-    }
-  }
+output "auth_jwt_secret_arn" {
+  value = data.aws_secretsmanager_secret.auth_jwt.arn
+}
+
+output "auth_db_secret_arn" {
+  value = data.aws_secretsmanager_secret.auth_db.arn
+}
+
+output "patient_db_secret_arn" {
+  value = data.aws_secretsmanager_secret.patient_db.arn
+}
+
+output "api_gateway_jwt_secret_arn" {
+  value = data.aws_secretsmanager_secret.api_gateway_jwt.arn
+}
+
+output "auth_jwt_secret_name" {
+  value = data.aws_secretsmanager_secret.auth_jwt.name
+}
+
+output "auth_db_secret_name" {
+  value = data.aws_secretsmanager_secret.auth_db.name
+}
+
+output "patient_db_secret_name" {
+  value = data.aws_secretsmanager_secret.patient_db.name
+}
+
+output "api_gateway_jwt_secret_name" {
+  value = data.aws_secretsmanager_secret.api_gateway_jwt.name
 }

@@ -1,6 +1,3 @@
-
-
-# IAM role for Lambda
 resource "aws_iam_role" "rotation_lambda_role" {
   name = "${var.name_prefix}-secret-rotation-role"
   
@@ -48,7 +45,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Lambda policy for Secrets Manager
+# Lambda policy for Secrets Manager - Using DATA SOURCES instead of resources
 resource "aws_iam_role_policy" "secrets_manager_access" {
   name = "${var.name_prefix}-secrets-manager-access"
   role = aws_iam_role.rotation_lambda_role.id
@@ -62,29 +59,49 @@ resource "aws_iam_role_policy" "secrets_manager_access" {
           "secretsmanager:DescribeSecret",
           "secretsmanager:GetSecretValue",
           "secretsmanager:PutSecretValue",
-          "secretsmanager:UpdateSecretVersionStage"
+          "secretsmanager:UpdateSecretVersionStage",
+          "secretsmanager:GetRandomPassword" 
         ]
-        Resource = [for secret in aws_secretsmanager_secret.secrets : secret.arn]
+        # Reference data sources instead of resources
+        Resource = [
+          data.aws_secretsmanager_secret.auth_db.arn,
+          data.aws_secretsmanager_secret.patient_db.arn
+          # JWT secrets don't need rotation, so not included
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
       }
     ]
   })
 }
 
 # Create separate permission for EACH secret that needs rotation
-resource "aws_lambda_permission" "secrets_manager" {
-  for_each = {
-    for k, v in aws_secretsmanager_secret.secrets : k => v
-    if try(var.secrets[k].enable_rotation, false) == true  # Only for secrets with rotation enabled
+locals {
+  # Define which secrets need rotation
+  rotation_secrets = {
+    auth_db    = data.aws_secretsmanager_secret.auth_db
+    patient_db = data.aws_secretsmanager_secret.patient_db
   }
+}
+
+resource "aws_lambda_permission" "secrets_manager" {
+  for_each = local.rotation_secrets
   
   statement_id  = "AllowSecretsManagerInvocation-${each.key}"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.secret_rotation.function_name
   principal     = "secretsmanager.amazonaws.com"
-  source_arn    = each.value.arn  
+  source_arn    = each.value.arn
 }
 
-
+# Archive file for Lambda code
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/lambda"
