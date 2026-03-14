@@ -51,7 +51,7 @@ data "aws_secretsmanager_secret" "api_gateway_jwt" {
 
 
 resource "aws_secretsmanager_secret_rotation" "auth_db_rotation" {
-  count = local.rotation_enabled_secrets["auth_db"] ? 1 : 0
+  count = local.rotation_enabled_secrets["auth_db"].enable_rotation ? 1 : 0  # Add .enable_rotation
   
   secret_id           = data.aws_secretsmanager_secret.auth_db.id
   rotation_lambda_arn = aws_lambda_function.secret_rotation.arn
@@ -62,7 +62,7 @@ resource "aws_secretsmanager_secret_rotation" "auth_db_rotation" {
 }
 
 resource "aws_secretsmanager_secret_rotation" "patient_db_rotation" {
-  count = local.rotation_enabled_secrets["patient_db"] ? 1 : 0
+  count = local.rotation_enabled_secrets["patient_db"].enable_rotation ? 1 : 0  # Add .enable_rotation
   
   secret_id           = data.aws_secretsmanager_secret.patient_db.id
   rotation_lambda_arn = aws_lambda_function.secret_rotation.arn
