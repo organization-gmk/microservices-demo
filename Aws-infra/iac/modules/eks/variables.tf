@@ -83,14 +83,6 @@ variable "aws_load_balancer_controller_arn" {
   
 }
 
-
-
-variable "csi_secrets_driver_role_arn" {
-  description = "Secrets csi driver role arn from iam"
-  
-  
-}
-
 variable "auth_service_role_arn" {
   description = "Auth Service Role ARN"
   type = string
