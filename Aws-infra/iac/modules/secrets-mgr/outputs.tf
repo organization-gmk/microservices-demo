@@ -26,10 +26,10 @@ output "secret_ids" {
 }
 
 # Individual outputs for backward compatibility
-output "auth_jwt_secret_arn" {
-  description = "ARN of auth service JWT secret"
-  value       = aws_secretsmanager_secret.secrets["auth_jwt"].arn
-}
+# output "auth_jwt_secret_arn" {
+#   description = "ARN of auth service JWT secret"
+#   value       = aws_secretsmanager_secret.secrets["auth_jwt"].arn
+# }
 
 # output "auth_db_secret_arn" {
 #   description = "ARN of auth service database credentials"
