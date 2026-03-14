@@ -58,8 +58,4 @@ variable "node_groups" {
 }
 
 
-variable "jwt_secret_value" {
-  description = "The value for the JWT secret"
-  type        = string
-  sensitive   = true
-}
+
