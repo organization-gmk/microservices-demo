@@ -341,16 +341,17 @@ resource "aws_iam_role_policy_attachment" "cw_observability" {
 #  https://github.com/aws/secrets-store-csi-driver-provider-aws 
 
 ##############################################################################################
-# IRSA ASSUME ROLE POLICY MODULE - ONE FOR EACH SERVICE ACCOUNT
+# IRSA ASSUME ROLE POLICY MODULE - STATIC ABAC POLICY FOR SECRETS MANAGER ACCESS
 ##############################################################################################
 locals {
   oidc_sub_prefix = replace(var.oidc_provider_url, "https://", "")
 }
 
-# ABAC Policy - allows access only if tags match
-resource "aws_iam_policy" "abac_secrets_policy" {
-  name        = "${var.name_prefix}-abac-secrets-policy"
-  description = "ABAC policy for secrets access based on tags"
+resource "aws_iam_policy" "service_secrets_policies" {
+  for_each = var.service_accounts
+  
+  name        = "${var.name_prefix}-${each.key}-abac-secrets-policy"
+  description = "Secrets access for ${each.key} service account based on ABAC"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -365,8 +366,8 @@ resource "aws_iam_policy" "abac_secrets_policy" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "aws:ResourceTag/Service"     = "$${aws:PrincipalTag/Service}"
-            "aws:ResourceTag/Environment" = "$${aws:PrincipalTag/Environment}"
+            "aws:ResourceTag/Service"     = each.value.service_tag
+            "aws:ResourceTag/Environment" = var.tags["Environment"]
           }
         }
       },
@@ -377,7 +378,7 @@ resource "aws_iam_policy" "abac_secrets_policy" {
         Resource = "*"
         Condition = {
           StringNotEquals = {
-            "aws:ResourceTag/Environment" = "$${aws:PrincipalTag/Environment}"
+            "aws:ResourceTag/Environment" = var.tags["Environment"]
           }
         }
       }
@@ -427,17 +428,7 @@ data "aws_iam_policy_document" "irsa_assume_role" {
       values   = ["sts.amazonaws.com"]
     }
     
-    condition {
-      test     = "StringEquals"
-      variable = "sts:RequestTag/Environment"
-      values   = [lookup(var.tags, "Environment", "dev")]
-    }
-    
-    condition {
-      test     = "StringEquals"
-      variable = "sts:RequestTag/Service"
-      values   = [each.value.service_tag]
-    }
+
   }
 }
 
@@ -445,5 +436,9 @@ data "aws_iam_policy_document" "irsa_assume_role" {
 resource "aws_iam_role_policy_attachment" "abac_attach" {
   for_each   = var.service_accounts
   role       = aws_iam_role.irsa_roles[each.key].name
-  policy_arn = aws_iam_policy.abac_secrets_policy.arn
+  policy_arn = aws_iam_policy.service_secrets_policies[each.key].arn
+
+  depends_on = [
+    aws_iam_policy.service_secrets_policies
+  ]
 }
