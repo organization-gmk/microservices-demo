@@ -6,7 +6,7 @@ metadata:
   labels:
     app: patient-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: patient-service
@@ -23,11 +23,9 @@ spec:
         ports:
         - containerPort: 4000
           name: http
-        - containerPort: 5005
-          name: debug
         env:
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:postgresql://patient-service-db:5432/$(DB_NAME)"
+          value: "jdbc:postgresql://patient-service-db:5432/patient_db"
         - name: SPRING_DATASOURCE_USERNAME
           valueFrom:
             secretKeyRef:
@@ -38,41 +36,23 @@ spec:
             secretKeyRef:
               name: patient-service-secrets
               key: POSTGRES_PASSWORD
-        - name: DB_NAME
-          valueFrom:
-            secretKeyRef:
-              name: patient-service-secrets
-              key: POSTGRES_DB
         - name: AWS_REGION
           value: "us-east-2"
-        envFrom:
-        - configMapRef:
-            name: patient-service-config
+        - name: SERVER_PORT
+          value: "4000"
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
         volumeMounts:
         - name: secrets-store
           mountPath: /mnt/secrets
           readOnly: true
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "384Mi"    # Reduced from 512Mi
+            cpu: "200m"        # Reduced from 250m
           limits:
-            memory: "1Gi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 4000
-          initialDelaySeconds: 90
-          periodSeconds: 10
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 4000
-          initialDelaySeconds: 70
-          periodSeconds: 5
-          failureThreshold: 3
+            memory: "768Mi"    # Reduced from 1Gi
+            cpu: "400m" 
       volumes:
       - name: secrets-store
         csi:
@@ -82,7 +62,7 @@ spec:
             secretProviderClass: patient-service-secrets
 
 ---
-# Horizontal Pod Autoscaler
+# Horizontal Pod Autoscaler - Adjusted for new resource limits
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -93,16 +73,15 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: patient-service
-  minReplicas: 2
-  maxReplicas: 5
+  minReplicas: 1  
+  maxReplicas: 3 
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
-
+        averageUtilization: 75  
 
 ---
 apiVersion: v1

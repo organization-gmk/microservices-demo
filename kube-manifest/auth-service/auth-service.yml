@@ -4,7 +4,7 @@ metadata:
   name: auth-service
   namespace: patient-service
 spec:
-  replicas: 2
+  replicas: 2  # Keep 2 for HA
   selector:
     matchLabels:
       app: auth-service
@@ -21,7 +21,7 @@ spec:
         - containerPort: 4005
         env:
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:postgresql://auth-db:5432/$(DB_NAME)"
+          value: "jdbc:postgresql://auth-db:5432/authdb"
         - name: SPRING_DATASOURCE_USERNAME
           valueFrom:
             secretKeyRef:
@@ -64,11 +64,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "384Mi"    # Reduced from 512Mi
+            cpu: "200m"        # Reduced from 250m
           limits:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "768Mi"    # Reduced from 1Gi
+            cpu: "400m"        # Reduced from 500m
         livenessProbe:
           httpGet:
             path: /actuator/health
@@ -77,9 +77,9 @@ spec:
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /actuator/health/readiness
+            path: /actuator/health
             port: 4005
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           periodSeconds: 5
       volumes:
       - name: secrets-store
@@ -88,9 +88,7 @@ spec:
           readOnly: true
           volumeAttributes:
             secretProviderClass: auth-service-secrets
-
 ---
-
 apiVersion: v1
 kind: Service
 metadata:

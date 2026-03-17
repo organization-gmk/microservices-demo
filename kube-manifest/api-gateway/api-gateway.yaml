@@ -6,7 +6,7 @@ metadata:
   labels:
     app: api-gateway
 spec:
-  replicas: 2
+  replicas: 2  # Keep 2 for HA
   selector:
     matchLabels:
       app: api-gateway
@@ -15,7 +15,7 @@ spec:
       labels:
         app: api-gateway
     spec:
-      serviceAccountName: api-gateway-sa  # This must match Terraform-created service account
+      serviceAccountName: api-gateway-sa
       containers:
       - name: api-gateway
         image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/api-gateway:latest
@@ -26,10 +26,8 @@ spec:
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "prod"
-        
         - name: JWT_SECRET_PATH
           value: "/mnt/secrets/JWT_SECRET"
-        
         - name: auth.service.url
           value: "http://auth-service.patient-service.svc.cluster.local:4005"
         - name: AWS_REGION
@@ -45,11 +43,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "384Mi"    # Reduced from 512Mi
+            cpu: "200m"        # Reduced from 250m
           limits:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "768Mi"    # Reduced from 1Gi
+            cpu: "400m"        # Reduced from 500m
         livenessProbe:
           httpGet:
             path: /health
