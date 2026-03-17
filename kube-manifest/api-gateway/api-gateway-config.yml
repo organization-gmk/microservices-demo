@@ -31,6 +31,4 @@ data:
                 - StripPrefix=1
                 - name: JwtValidation
 
-    # JWT secret removed - now comes from Secrets Manager!
-  # Individual keys for environment variables (non-sensitive only)
   auth.service.url: "http://auth-service.patient-service.svc.cluster.local:4005"

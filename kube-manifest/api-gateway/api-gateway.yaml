@@ -15,7 +15,7 @@ spec:
       labels:
         app: api-gateway
     spec:
-      serviceAccountName: api-gateway-sa
+      serviceAccountName: api-gateway-sa  # This must match Terraform-created service account
       containers:
       - name: api-gateway
         image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/api-gateway:latest
@@ -26,10 +26,10 @@ spec:
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "prod"
-        - name: JWT_SECRET
-          valueFrom:
+        
         - name: JWT_SECRET_PATH
           value: "/mnt/secrets/JWT_SECRET"
+        
         - name: auth.service.url
           value: "http://auth-service.patient-service.svc.cluster.local:4005"
         - name: AWS_REGION
