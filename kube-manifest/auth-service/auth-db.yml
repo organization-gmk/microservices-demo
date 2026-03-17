@@ -14,6 +14,7 @@ spec:
       labels:
         app: auth-db
     spec:
+      serviceAccountName: auth-service-sa  # IMPORTANT: Add this!
       containers:
       - name: postgres
         image: postgres:15
@@ -39,6 +40,16 @@ spec:
         - name: data
           mountPath: /var/lib/postgresql/data
           subPath: postgres
+        - name: secrets-store  # ADD THIS
+          mountPath: /mnt/secrets
+          readOnly: true
+      volumes:
+      - name: secrets-store  # ADD THIS
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: auth-service-secrets
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -48,17 +59,3 @@ spec:
       resources:
         requests:
           storage: 5Gi
-
----
-# Auth Database Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: auth-db
-  namespace: patient-service
-spec:
-  selector:
-    app: auth-db
-  ports:
-  - port: 5432
-    targetPort: 5432

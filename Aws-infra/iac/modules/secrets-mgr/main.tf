@@ -5,7 +5,7 @@ locals {
       name           = "auth-service/jwt-secret"
       description    = "JWT signing secret for auth service"
       service_tag    = "auth"
-      enable_rotation = false  # JWT doesn't auto-rotate
+      enable_rotation = false  
     }
     auth_db = {
       name           = "auth-service/db-credentials"
@@ -23,7 +23,7 @@ locals {
       name           = "api-gateway/jwt-secret"
       description    = "JWT secret for API Gateway"
       service_tag    = "apigateway"
-      enable_rotation = false  # JWT doesn't auto-rotate
+      enable_rotation = false  
     }
   }
   
@@ -33,27 +33,27 @@ locals {
   }
 }
 
-data "aws_secretsmanager_secret" "auth_jwt" {
-  name = "auth-service/jwt-secret"
-}
-
-data "aws_secretsmanager_secret" "auth_db" {
-  name = "auth-service/db-credentials"
-}
-
-data "aws_secretsmanager_secret" "patient_db" {
-  name = "patient-service/db-credentials"
-}
-
-data "aws_secretsmanager_secret" "api_gateway_jwt" {
-  name = "api-gateway/jwt-secret"
-}
-
-
-resource "aws_secretsmanager_secret_rotation" "auth_db_rotation" {
-  count = local.rotation_enabled_secrets["auth_db"].enable_rotation ? 1 : 0  # Add .enable_rotation
+resource "aws_secretsmanager_secret" "secrets" {
+  for_each = local.secrets
   
-  secret_id           = data.aws_secretsmanager_secret.auth_db.id
+  name        = each.value.name
+  description = each.value.description
+  
+  # Protect against accidental deletion
+  recovery_window_in_days = 7
+  
+  tags = merge(var.tags, {
+    Service  = each.value.service_tag
+    Rotation = each.value.enable_rotation ? "enabled" : "disabled"
+    ManagedBy = "terraform"
+  })
+}
+
+# Enable rotation for database credentials
+resource "aws_secretsmanager_secret_rotation" "auth_db_rotation" {
+  count = local.secrets["auth_db"].enable_rotation ? 1 : 0
+  
+  secret_id           = aws_secretsmanager_secret.secrets["auth_db"].id
   rotation_lambda_arn = aws_lambda_function.secret_rotation.arn
   
   rotation_rules {
@@ -62,9 +62,9 @@ resource "aws_secretsmanager_secret_rotation" "auth_db_rotation" {
 }
 
 resource "aws_secretsmanager_secret_rotation" "patient_db_rotation" {
-  count = local.rotation_enabled_secrets["patient_db"].enable_rotation ? 1 : 0  # Add .enable_rotation
+  count = local.secrets["patient_db"].enable_rotation ? 1 : 0
   
-  secret_id           = data.aws_secretsmanager_secret.patient_db.id
+  secret_id           = aws_secretsmanager_secret.secrets["patient_db"].id
   rotation_lambda_arn = aws_lambda_function.secret_rotation.arn
   
   rotation_rules {

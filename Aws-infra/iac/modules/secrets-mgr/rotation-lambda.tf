@@ -1,3 +1,8 @@
+##############################################################################################
+# LAMBDA FOR SECRET ROTATION
+##############################################################################################
+
+# IAM role for Lambda
 resource "aws_iam_role" "rotation_lambda_role" {
   name = "${var.name_prefix}-secret-rotation-role"
   
@@ -26,13 +31,13 @@ resource "aws_lambda_function" "secret_rotation" {
   timeout       = 300
   memory_size   = 128
 
-  filename      = data.archive_file.lambda_zip.output_path
+  filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
       SECRETS_MANAGER_ENDPOINT = "https://secretsmanager.${var.aws_region}.amazonaws.com"
-      LOG_LEVEL = "INFO"
+      LOG_LEVEL                = "INFO"
     }
   }
 
@@ -45,7 +50,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Lambda policy for Secrets Manager - Using DATA SOURCES instead of resources
+# Lambda policy for Secrets Manager
 resource "aws_iam_role_policy" "secrets_manager_access" {
   name = "${var.name_prefix}-secrets-manager-access"
   role = aws_iam_role.rotation_lambda_role.id
@@ -60,13 +65,12 @@ resource "aws_iam_role_policy" "secrets_manager_access" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:PutSecretValue",
           "secretsmanager:UpdateSecretVersionStage",
-          "secretsmanager:GetRandomPassword" 
+          "secretsmanager:GetRandomPassword"
         ]
-        # Reference data sources instead of resources
+        # Using the secrets resources
         Resource = [
-          data.aws_secretsmanager_secret.auth_db.arn,
-          data.aws_secretsmanager_secret.patient_db.arn
-          # JWT secrets don't need rotation, so not included
+          aws_secretsmanager_secret.secrets["auth_db"].arn,
+          aws_secretsmanager_secret.secrets["patient_db"].arn
         ]
       },
       {
@@ -84,15 +88,14 @@ resource "aws_iam_role_policy" "secrets_manager_access" {
 
 # Create separate permission for EACH secret that needs rotation
 locals {
-  # Define which secrets need rotation
-  rotation_secrets = {
-    auth_db    = data.aws_secretsmanager_secret.auth_db
-    patient_db = data.aws_secretsmanager_secret.patient_db
+  rotation_secrets_map = {
+    for k, v in aws_secretsmanager_secret.secrets : k => v
+    if local.secrets[k].enable_rotation == true
   }
 }
 
 resource "aws_lambda_permission" "secrets_manager" {
-  for_each = local.rotation_secrets
+  for_each = local.rotation_secrets_map
   
   statement_id  = "AllowSecretsManagerInvocation-${each.key}"
   action        = "lambda:InvokeFunction"
