@@ -55,3 +55,7 @@ variable "service_accounts" {
     
   }
 }
+
+variable "sns_security_alerts_arn" {
+  type = string
+}

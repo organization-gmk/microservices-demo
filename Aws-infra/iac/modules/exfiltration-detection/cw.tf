@@ -73,6 +73,15 @@ resource "aws_cloudwatch_metric_alarm" "failed_access_alarm" {
   tags = var.tags
 }
 
+resource "aws_cloudwatch_log_group" "cloudtrail" {
+  name              = "/aws/cloudtrail/${var.name_prefix}-secrets-audit"
+  retention_in_days = 90
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-cloudtrail-logs"
+  })
+}
+
 #---------------------------------------------------------------------
 # CLOUDWATCH DASHBOARD
 #---------------------------------------------------------------------

@@ -15,6 +15,7 @@ module "iam" {
 
   name_prefix       = local.name_prefix
   oidc_provider_url = module.eks.cluster_oidc_issuer_url
+  sns_security_alerts_arn = module.exfiltration.sns_security_alerts_arn 
  
 
   tags = local.common_tags
