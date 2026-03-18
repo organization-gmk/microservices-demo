@@ -1,59 +1,8 @@
-resource "aws_cloudwatch_log_group" "cloudtrail" {
-  name              = "/aws/cloudtrail/${var.name_prefix}-secrets-audit"
-  retention_in_days = 90
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-cloudtrail-logs"
-  })
-}
-
-# Metric filter #1: Count of secret retrievals
-resource "aws_cloudwatch_log_metric_filter" "secret_retrieval_count" {
-  name           = "${var.name_prefix}-secret-retrieval-count"
-  pattern        = "{ ($.eventSource = \"secretsmanager.amazonaws.com\") && ($.eventName = \"GetSecretValue\") }"
-  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
-
-  metric_transformation {
-    name      = "SecretRetrievalCount"
-    namespace = "Security/SecretsManager"
-    value     = "1"
-    default_value = "0"
-  }
-}
-
-# Metric filter #2: Distinct secrets accessed (for anomaly detection)
-resource "aws_cloudwatch_log_metric_filter" "distinct_secrets" {
-  name           = "${var.name_prefix}-distinct-secrets-accessed"
-  pattern        = "{ ($.eventSource = \"secretsmanager.amazonaws.com\") && ($.eventName = \"GetSecretValue\") }"
-  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
-
-  metric_transformation {
-    name      = "DistinctSecretsAccessed"
-    namespace = "Security/SecretsManager"
-    value     = "1"
-    default_value = "0"
-  }
-}
-
-# Metric filter #3: Failed access attempts
-resource "aws_cloudwatch_log_metric_filter" "failed_access" {
-  name           = "${var.name_prefix}-failed-secret-access"
-  pattern        = "{ ($.eventSource = \"secretsmanager.amazonaws.com\") && ($.eventName = \"GetSecretValue\") && ($.errorCode = \"*Denied*\") }"
-  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
-
-  metric_transformation {
-    name      = "FailedSecretAccess"
-    namespace = "Security/SecretsManager"
-    value     = "1"
-    default_value = "0"
-  }
-}
-
 #---------------------------------------------------------------------
-# 3. CLOUDWATCH ALARMS (EXFILTRATION DETECTION)
+# CLOUDWATCH ALARMS (EXFILTRATION DETECTION)
 #---------------------------------------------------------------------
 
-# Alarm #1: Rapid secret retrieval (20+ in 5 minutes)
+# Alarm #1: Rapid secret retrieval (SIMPLE THRESHOLD)
 resource "aws_cloudwatch_metric_alarm" "rapid_retrieval" {
   alarm_name          = "${var.name_prefix}-rapid-retrieval-alarm"
   comparison_operator = "GreaterThanThreshold"
@@ -62,8 +11,8 @@ resource "aws_cloudwatch_metric_alarm" "rapid_retrieval" {
   namespace           = "Security/SecretsManager"
   period              = "300"  # 5 minutes
   statistic           = "Sum"
-  threshold           = "3"   # 3+ retrievals
-  alarm_description   = "🚨 POSSIBLE EXFILTRATION: 20+ secrets retrieved in 5 minutes"
+  threshold           = var.threshold_rapid_retrieval  # 3+ retrievals for testing (change to 20 for production)
+  alarm_description   = "🚨 POSSIBLE EXFILTRATION: ${var.threshold_rapid_retrieval} secrets retrieved in 5 minutes"
   alarm_actions       = [aws_sns_topic.security_alerts.arn]
   ok_actions          = [aws_sns_topic.security_alerts.arn]
   
@@ -74,19 +23,18 @@ resource "aws_cloudwatch_metric_alarm" "rapid_retrieval" {
   })
 }
 
-# Alarm #2: Unusual number of distinct secrets
+# Alarm #2: Unusual number of distinct secrets (ANOMALY DETECTION)
 resource "aws_cloudwatch_metric_alarm" "unusual_pattern" {
   alarm_name          = "${var.name_prefix}-unusual-pattern-alarm"
-  comparison_operator = "GreaterThanUpperThreshold"
+  comparison_operator = "LessThanLowerOrGreaterThanUpperThreshold"
   evaluation_periods  = "2"
-  metric_name         = "DistinctSecretsAccessed"
-  namespace           = "Security/SecretsManager"
-  period              = "300"
-  statistic           = "Sum"
   threshold_metric_id = "ad1"
   alarm_description   = "⚠️ ANOMALY DETECTED: Unusual pattern in secret access"
   alarm_actions       = [aws_sns_topic.security_alerts.arn]
+  ok_actions          = [aws_sns_topic.security_alerts.arn]
+  insufficient_data_actions = []
 
+  # First metric query - the actual data
   metric_query {
     id          = "m1"
     return_data = true
@@ -98,17 +46,18 @@ resource "aws_cloudwatch_metric_alarm" "unusual_pattern" {
     }
   }
 
+  # Second metric query - anomaly detection band
   metric_query {
     id          = "ad1"
     expression  = "ANOMALY_DETECTION_BAND(m1, 2)"
-    label       = "DistinctSecretsAccessed (expected)"
+    label       = "DistinctSecretsAccessed (expected range)"
     return_data = true
   }
 
   tags = var.tags
 }
 
-# Alarm #3: Failed access attempts (potential brute force)
+# Alarm #3: Failed access attempts (SIMPLE THRESHOLD)
 resource "aws_cloudwatch_metric_alarm" "failed_access_alarm" {
   alarm_name          = "${var.name_prefix}-failed-access-alarm"
   comparison_operator = "GreaterThanThreshold"
@@ -117,15 +66,15 @@ resource "aws_cloudwatch_metric_alarm" "failed_access_alarm" {
   namespace           = "Security/SecretsManager"
   period              = "300"
   statistic           = "Sum"
-  threshold           = "5"    # 5+ failed attempts
-  alarm_description   = "⚠️ Multiple failed secret access attempts"
+  threshold           = var.threshold_failed_access   # 5+ failed attempts
+  alarm_description   = "⚠️ Multiple failed secret access attempts (${var.threshold_failed_access}+ in 5 minutes)"
   alarm_actions       = [aws_sns_topic.security_alerts.arn]
   
   tags = var.tags
 }
 
-
-# 6. CLOUDWATCH DASHBOARD
+#---------------------------------------------------------------------
+# CLOUDWATCH DASHBOARD
 #---------------------------------------------------------------------
 
 resource "aws_cloudwatch_dashboard" "security_dashboard" {
