@@ -30,7 +30,7 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+        Resource = "${var.cw_log_groupcloudtrail_arn}:*"
       }
     ]
   })
@@ -84,7 +84,7 @@ resource "aws_iam_policy" "auto_revoke_lambda_policy" {
         Action = [
           "sns:Publish"
         ]
-        Resource = aws_sns_topic.security_alerts.arn
+        Resource = var.sns_security_alerts_arn
       },
       {
         Effect = "Allow"

@@ -59,3 +59,7 @@ variable "service_accounts" {
 variable "sns_security_alerts_arn" {
   type = string
 }
+
+variable "cw_log_groupcloudtrail_arn" {
+  type = string
+}
