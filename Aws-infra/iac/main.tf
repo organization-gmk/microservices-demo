@@ -52,3 +52,15 @@ module "secrets" {
    tags                  = local.common_tags
 
 }
+
+module "exfiltration" {
+  source = "./modules/exfiltration-detection"
+
+  name_prefix = local.name_prefix
+  aws_region = var.aws_region
+  security_alert_email = var.security_alert_email
+  cloudtrail_cloudwatch_role_arn = module.iam.iam_cw_cloudtrail_arn
+  auto_revoke_lambda_arn         = module.iam.iam_lambda_auto_revoke_arn
+  tags        = local.common_tags 
+  
+}

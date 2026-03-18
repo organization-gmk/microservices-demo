@@ -22,3 +22,4 @@ node_groups = {
     }
   }
 }
+security_alert_email = "guttikonda-mohan.krishna@atos.net"

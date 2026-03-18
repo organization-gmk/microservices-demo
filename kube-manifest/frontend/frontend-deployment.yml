@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: patient-frontend
-        image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/patient-frontend:V0.0.7
+        image: 361509912577.dkr.ecr.us-east-2.amazonaws.com/micro-services/patient-frontend:V0.0.8
         imagePullPolicy: Always
         ports:
         - containerPort: 80

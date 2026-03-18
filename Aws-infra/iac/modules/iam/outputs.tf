@@ -49,3 +49,18 @@ output "patient_service_role_arn" {
 output "api_gateway_role_arn" {
   value = aws_iam_role.irsa_roles["api-gateway"].arn
 }
+
+##########################################################
+#         Exfiltration Detection Outputs
+##########################################################
+
+output "iam_cw_cloudtrail_arn" {
+  description = "cloud trail cloudwatch role arn"
+  value = aws_iam_role.cloudtrail_cloudwatch.arn
+
+}
+
+output "lambda_auto_revoke_arn" {
+  description = "ARN of the Lambda role for auto-revoke"
+  value = aws_iam_role.auto_revoke_lambda.arn
+}

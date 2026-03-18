@@ -58,4 +58,6 @@ variable "node_groups" {
 }
 
 
-
+variable "security_alert_email" {
+  type = string
+}
