@@ -1,6 +1,57 @@
 #---------------------------------------------------------------------
 # CLOUDWATCH ALARMS (EXFILTRATION DETECTION)
 #---------------------------------------------------------------------
+resource "aws_cloudwatch_log_group" "cloudtrail" {
+  name              = "/aws/cloudtrail/${var.name_prefix}-secrets-audit"
+  retention_in_days = 90
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-cloudtrail-logs"
+  })
+}
+
+#---------------------------------------------------------------------
+# CLOUDWATCH METRIC FILTERS
+#---------------------------------------------------------------------
+resource "aws_cloudwatch_log_metric_filter" "secret_retrieval_count" {
+  name           = "${var.name_prefix}-secret-retrieval-count"
+  pattern        = "{ ($.eventSource = \"secretsmanager.amazonaws.com\") && ($.eventName = \"GetSecretValue\") }"
+  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
+
+  metric_transformation {
+    name      = "SecretRetrievalCount"
+    namespace = "Security/SecretsManager"
+    value     = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "distinct_secrets" {
+  name           = "${var.name_prefix}-distinct-secrets-accessed"
+  pattern        = "{ ($.eventSource = \"secretsmanager.amazonaws.com\") && ($.eventName = \"GetSecretValue\") }"
+  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
+
+  metric_transformation {
+    name      = "DistinctSecretsAccessed"
+    namespace = "Security/SecretsManager"
+    value     = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "failed_access" {
+  name           = "${var.name_prefix}-failed-secret-access"
+  pattern        = "{ ($.eventSource = \"secretsmanager.amazonaws.com\") && ($.eventName = \"GetSecretValue\") && ($.errorCode = \"*Denied*\") }"
+  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
+
+  metric_transformation {
+    name      = "FailedSecretAccess"
+    namespace = "Security/SecretsManager"
+    value     = "1"
+    default_value = "0"
+  }
+}
+
 
 # Alarm #1: Rapid secret retrieval (SIMPLE THRESHOLD)
 resource "aws_cloudwatch_metric_alarm" "rapid_retrieval" {
