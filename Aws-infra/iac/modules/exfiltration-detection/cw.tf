@@ -140,7 +140,7 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
           markdown = <<EOF
 #Secrets Manager Security Dashboard
 
-## Auto-Revocation Status: **ACTIVE**
+## Auto-Revocation Status: ACTIVE
 - Response Time: < 2 minutes
 - Rotation on detection: **Immediate (1 day)**
 - Monitoring: 24/7

@@ -8,22 +8,10 @@ resource "aws_cloudtrail" "secrets_audit" {
   cloud_watch_logs_role_arn     = var.cloudtrail_cloudwatch_role_arn
 
   # Enable data events for Secrets Manager
-   advanced_event_selector {
-    name = "SecretsManagerEvents"
-    
-    field_selector {
-    field  = "eventCategory"
-    equals = ["Management"]
-    }
-
-    field_selector {
-    field  = "eventName"
-    equals = [
-      "GetSecretValue"
-    ]
+   event_selector {
+    read_write_type           = "All"
+    include_management_events = true
   }
-     
-   }
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-secrets-audit-trail"
