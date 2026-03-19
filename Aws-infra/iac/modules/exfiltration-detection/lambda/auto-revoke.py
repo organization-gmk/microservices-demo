@@ -167,18 +167,20 @@ def revoke_secret(secret_arn: str, alarm_name: str) -> Dict[str, Any]:
         # Check if rotation is already enabled
         rotation_enabled = secret_info.get('RotationEnabled', False)
         
+        # CRITICAL FIX: Don't pass RotationRules if rotation is already enabled
         if rotation_enabled:
-            # Force immediate rotation
+            # Force immediate rotation using the EXISTING rotation configuration
+            # Just call rotate_secret without any parameters
+            logger.info(f"Secret {secret_name} has rotation enabled, triggering immediate rotation")
             response = secretsmanager.rotate_secret(
-                SecretId=secret_name,
-                RotationRules={
-                    'AutomaticallyAfterDays': 1
-                }
+                SecretId=secret_name
+                # No RotationRules - uses existing configuration
             )
-            result['action'] = 'rotated'
-            logger.info(f"✅ Rotated secret: {secret_name}")
+            result['action'] = 'rotated_existing'
+            logger.info(f"✅ Triggered rotation for secret: {secret_name}")
         else:
-            # Enable rotation with immediate effect
+            # Enable rotation with immediate effect for non-rotating secrets
+            logger.info(f"Secret {secret_name} has no rotation, enabling with 1-day schedule")
             response = secretsmanager.rotate_secret(
                 SecretId=secret_name,
                 RotationRules={
