@@ -16,9 +16,17 @@ resource "aws_cloudtrail" "secrets_audit" {
       equals = ["Data"]  # For Secrets Manager, use "Data" as eventCategory
     }
     
-    field_selector {
-      field  = "resources.type"
-      equals = ["AWS::SecretsManager::Secret"]
+   field_selector {
+      field  = "eventName"
+      equals = [
+        "GetSecretValue",
+        "DescribeSecret",
+        "ListSecrets"
+      ]
+    }
+     field_selector {
+      field  = "readOnly"
+      equals = ["true"]
     }
    }
 

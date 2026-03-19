@@ -12,7 +12,7 @@ resource "aws_cloudwatch_metric_alarm" "rapid_retrieval" {
   period              = "300"  # 5 minutes
   statistic           = "Sum"
   threshold           = var.threshold_rapid_retrieval  # 3+ retrievals for testing (change to 20 for production)
-  alarm_description   = "🚨 POSSIBLE EXFILTRATION: ${var.threshold_rapid_retrieval} secrets retrieved in 5 minutes"
+  alarm_description   = "POSSIBLE EXFILTRATION: ${var.threshold_rapid_retrieval} secrets retrieved in 5 minutes"
   alarm_actions       = [aws_sns_topic.security_alerts.arn]
   ok_actions          = [aws_sns_topic.security_alerts.arn]
   
@@ -29,7 +29,7 @@ resource "aws_cloudwatch_metric_alarm" "unusual_pattern" {
   comparison_operator = "LessThanLowerOrGreaterThanUpperThreshold"
   evaluation_periods  = "2"
   threshold_metric_id = "ad1"
-  alarm_description   = "⚠️ ANOMALY DETECTED: Unusual pattern in secret access"
+  alarm_description   = "ANOMALY DETECTED: Unusual pattern in secret access"
   alarm_actions       = [aws_sns_topic.security_alerts.arn]
   ok_actions          = [aws_sns_topic.security_alerts.arn]
   insufficient_data_actions = []
@@ -67,7 +67,7 @@ resource "aws_cloudwatch_metric_alarm" "failed_access_alarm" {
   period              = "300"
   statistic           = "Sum"
   threshold           = var.threshold_failed_access   # 5+ failed attempts
-  alarm_description   = "⚠️ Multiple failed secret access attempts (${var.threshold_failed_access}+ in 5 minutes)"
+  alarm_description   = "Multiple failed secret access attempts (${var.threshold_failed_access}+ in 5 minutes)"
   alarm_actions       = [aws_sns_topic.security_alerts.arn]
   
   tags = var.tags
@@ -102,7 +102,7 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
           period = 300
           stat   = "Sum"
           region = var.aws_region
-          title  = "📊 Secret Access Metrics (Last 6 hours)"
+          title  = "Secret Access Metrics (Last 6 hours)"
           view   = "timeSeries"
           stacked = false
           yAxis = {
@@ -122,7 +122,7 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
             aws_cloudwatch_metric_alarm.unusual_pattern.arn,
             aws_cloudwatch_metric_alarm.failed_access_alarm.arn
           ]
-          title = "🚨 Security Alarms"
+          title = "Security Alarms"
         }
       },
       {
@@ -130,7 +130,7 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
         properties = {
           query   = "SOURCE '${aws_cloudwatch_log_group.cloudtrail.name}' | fields @timestamp, eventName, userIdentity.arn as User, resources.0.ARN as Secret, errorCode | filter eventName = 'GetSecretValue' | sort @timestamp desc | limit 20"
           region  = var.aws_region
-          title   = "📋 Recent Secret Access Events"
+          title   = "Recent Secret Access Events"
           view    = "table"
         }
       },
@@ -138,18 +138,18 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
         type = "text"
         properties = {
           markdown = <<EOF
-# 🔐 Secrets Manager Security Dashboard
+#Secrets Manager Security Dashboard
 
 ## Auto-Revocation Status: **ACTIVE**
-- ⚡ Response Time: < 2 minutes
-- 🔄 Rotation on detection: **Immediate (1 day)**
-- 📊 Monitoring: 24/7
-- 🚨 Alerts: Email + Slack
+- Response Time: < 2 minutes
+- Rotation on detection: **Immediate (1 day)**
+- Monitoring: 24/7
+- Alerts: Email + Slack
 
 ## Recent Auto-Revocation Events
 Check Lambda logs for details: `/aws/lambda/${var.name_prefix}-auto-revoke-secrets`
 EOF
-          title   = "ℹ️ Security Summary"
+          title   = "Security Summary"
         }
       }
     ]
