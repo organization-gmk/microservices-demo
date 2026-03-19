@@ -59,6 +59,11 @@ resource "aws_secretsmanager_secret_rotation" "auth_db_rotation" {
   rotation_rules {
     automatically_after_days = 30
   }
+  lifecycle {
+    ignore_changes = [
+      rotation_rules,  # Ignore rotation rule changes during active rotation
+    ]
+  }
 }
 
 resource "aws_secretsmanager_secret_rotation" "patient_db_rotation" {
@@ -69,5 +74,10 @@ resource "aws_secretsmanager_secret_rotation" "patient_db_rotation" {
   
   rotation_rules {
     automatically_after_days = 30
+  }
+  lifecycle {
+    ignore_changes = [
+      rotation_rules,  # Ignore rotation rule changes during active rotation
+    ]
   }
 }
