@@ -17,22 +17,12 @@ resource "aws_cloudtrail" "secrets_audit" {
     }
 
     field_selector {
-    field  = "eventSource"
-    equals = ["secretsmanager.amazonaws.com"]
-    }
-    
-   field_selector {
-      field  = "eventName"
-      equals = [
-        "GetSecretValue",
-        "DescribeSecret",
-        "ListSecrets"
-      ]
-    }
-     field_selector {
-      field  = "readOnly"
-      equals = ["true"]
-    }
+    field  = "eventName"
+    equals = [
+      "GetSecretValue"
+    ]
+  }
+     
    }
 
   tags = merge(var.tags, {
