@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import string
-import time
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,48 +27,37 @@ def lambda_handler(event, context):
         test_secret(secret_id, token)
     elif step == 'finishSecret':
         finish_secret(secret_id, token)
-    else:
-        raise ValueError(f"Invalid step: {step}")
     
     return {'statusCode': 200}
 
 def create_secret(secret_id, token):
     """Create a new secret version with a NEW password"""
     try:
-        # Check if version already exists
-        secretsmanager.get_secret_value(
-            SecretId=secret_id,
-            VersionId=token,
-            VersionStage='AWSPENDING'
-        )
-        logger.info(f"Secret version {token} already exists")
+        secretsmanager.get_secret_value(SecretId=secret_id, VersionId=token, VersionStage='AWSPENDING')
+        logger.info(f"Version {token} already exists")
         return
-    except secretsmanager.exceptions.ResourceNotFoundException:
+    except:
         pass
     
     # Get current secret
-    current = secretsmanager.get_secret_value(
-        SecretId=secret_id,
-        VersionStage='AWSCURRENT'
-    )
+    current = secretsmanager.get_secret_value(SecretId=secret_id, VersionStage='AWSCURRENT')
     current_secret = json.loads(current['SecretString'])
     
-    # 🔥 CRITICAL: Generate a NEW password
-    new_password = generate_password()
-    logger.info(f"Generated new password: {new_password[:10]}...")
+    # 🔥 GENERATE A BRAND NEW PASSWORD
+    chars = string.ascii_letters + string.digits + "!@#$%^&*"
+    new_password = ''.join(random.choice(chars) for _ in range(20))
+    logger.info(f"✨ GENERATED NEW PASSWORD: {new_password}")
     
-    # Create NEW secret with updated password
+    # Create new secret with the new password
     new_secret = current_secret.copy()
     
-    # Update password in the secret
+    # Update the password field
     if 'POSTGRES_PASSWORD' in new_secret:
         new_secret['POSTGRES_PASSWORD'] = new_password
-    elif 'password' in new_secret:
-        new_secret['password'] = new_password
+        logger.info(f"Updated POSTGRES_PASSWORD field")
     else:
         new_secret['password'] = new_password
-    
-    logger.info(f"New secret created with password: {new_secret.get('password', 'N/A')[:10]}...")
+        logger.info(f"Updated password field")
     
     # Create new pending version
     secretsmanager.put_secret_value(
@@ -78,19 +66,18 @@ def create_secret(secret_id, token):
         SecretString=json.dumps(new_secret),
         VersionStages=['AWSPENDING']
     )
-    logger.info(f"✅ Created new pending secret version {token}")
+    logger.info(f"✅ Created new pending version {token} with NEW password")
 
 def set_secret(secret_id, token):
-    """Update database with new password (POC - just log)"""
-    # Get the pending secret
+    """Update database with new password (POC - skip)"""
     pending = secretsmanager.get_secret_value(
         SecretId=secret_id,
         VersionId=token,
         VersionStage='AWSPENDING'
     )
     secret = json.loads(pending['SecretString'])
-    logger.info(f"✅ POC: Would update database with new password: {secret.get('password', 'N/A')[:10]}...")
-    # In production, you would update RDS here
+    new_password = secret.get('POSTGRES_PASSWORD', secret.get('password', 'unknown'))
+    logger.info(f"✅ POC: Would update database with new password: {new_password[:10]}...")
 
 def test_secret(secret_id, token):
     """Test the new secret (POC - assume success)"""
@@ -115,8 +102,3 @@ def finish_secret(secret_id, token):
         RemoveFromVersionId=current_version
     )
     logger.info(f"✅ Rotation complete! New version {token} is now AWSCURRENT")
-
-def generate_password(length=20):
-    """Generate a random password"""
-    chars = string.ascii_letters + string.digits + "!@#$%^&*"
-    return ''.join(random.choice(chars) for _ in range(length))
