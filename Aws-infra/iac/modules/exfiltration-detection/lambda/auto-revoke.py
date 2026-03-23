@@ -1,197 +1,226 @@
+# auto-revoke.py - CORRECTED VERSION
+"""
+Auto-Revocation Lambda for Secret Exfiltration Detection
+Triggered by CloudWatch Alarm via SNS
+"""
+
 import boto3
 import json
 import logging
-import random
-import string
 import os
-import sys
+from datetime import datetime, timedelta
+from typing import List, Dict, Any
 
+# Configure logging
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
 
+# Initialize AWS clients
 secretsmanager = boto3.client('secretsmanager')
+sns = boto3.client('sns')
+cloudtrail = boto3.client('cloudtrail')
 
-# Try to import psycopg2, but don't fail if not available
-try:
-    import psycopg2
-    HAS_DB = True
-except ImportError:
-    HAS_DB = False
-    logger.warning("psycopg2 not available - running in demo mode (no database updates)")
-
-def lambda_handler(event, context):
-    """Handle secret rotation from Secrets Manager"""
-    logger.info(f"Rotation event: {json.dumps(event)}")
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """
+    Main handler for auto-revocation Lambda
+    """
+    logger.info(f"Received event: {json.dumps(event)}")
     
-    secret_id = event['SecretId']
-    token = event['ClientRequestToken']
-    step = event['Step']
-    
-    if step == 'createSecret':
-        create_secret(secret_id, token)
-    elif step == 'setSecret':
-        set_secret(secret_id, token)
-    elif step == 'testSecret':
-        test_secret(secret_id, token)
-    elif step == 'finishSecret':
-        finish_secret(secret_id, token)
-    else:
-        raise ValueError(f"Invalid step: {step}")
-
-def create_secret(secret_id, token):
-    """Create a new secret version"""
     try:
-        # Check if version already exists
-        secretsmanager.get_secret_value(
-            SecretId=secret_id,
-            VersionId=token,
-            VersionStage='AWSPENDING'
-        )
-        logger.info(f"Secret version {token} already exists")
-        return
-    except secretsmanager.exceptions.ResourceNotFoundException:
-        pass
-    
-    # Get current secret
-    current = secretsmanager.get_secret_value(
-        SecretId=secret_id,
-        VersionStage='AWSCURRENT'
-    )
-    current_secret = json.loads(current['SecretString'])
-    
-    # Generate new password
-    new_password = generate_password()
-    
-    # Update the secret value
-    if 'POSTGRES_PASSWORD' in current_secret:
-        current_secret['POSTGRES_PASSWORD'] = new_password
-    elif 'password' in current_secret:
-        current_secret['password'] = new_password
-    else:
-        current_secret['password'] = new_password
-    
-    # Create new version
-    secretsmanager.put_secret_value(
-        SecretId=secret_id,
-        ClientRequestToken=token,
-        SecretString=json.dumps(current_secret),
-        VersionStages=['AWSPENDING']
-    )
-    logger.info(f"✅ Created new secret version {token}")
-
-def set_secret(secret_id, token):
-    """Update database with new password (if available)"""
-    # Get pending secret
-    try:
-        pending = secretsmanager.get_secret_value(
-            SecretId=secret_id,
-            VersionId=token,
-            VersionStage='AWSPENDING'
-        )
-        secret = json.loads(pending['SecretString'])
+        # Parse SNS message from CloudWatch alarm
+        # The event is from SNS, not directly from Secrets Manager!
+        sns_message = json.loads(event['Records'][0]['Sns']['Message'])
+        alarm_name = sns_message.get('AlarmName', 'unknown')
+        alarm_reason = sns_message.get('NewStateReason', 'unknown')
+        
+        logger.info(f"Alarm triggered: {alarm_name}")
+        logger.info(f"Reason: {alarm_reason}")
+        
+        # Get secrets accessed in last 15 minutes
+        affected_secrets = get_recently_accessed_secrets(minutes=15)
+        
+        if not affected_secrets:
+            logger.info("No secrets accessed in last 15 minutes")
+            return {
+                'statusCode': 200,
+                'body': json.dumps({'message': 'No secrets to revoke'})
+            }
+        
+        logger.info(f"Found {len(affected_secrets)} potentially compromised secrets")
+        
+        # Revoke each secret
+        revoked = []
+        failed = []
+        
+        for secret_arn in affected_secrets:
+            result = revoke_secret(secret_arn, alarm_name)
+            if result['success']:
+                revoked.append(result)
+            else:
+                failed.append(result)
+        
+        # Send summary notification
+        send_summary_notification(alarm_name, alarm_reason, revoked, failed)
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'alarm': alarm_name,
+                'revoked_count': len(revoked),
+                'failed_count': len(failed),
+                'revoked_details': revoked,
+                'failed_details': failed,
+                'timestamp': datetime.utcnow().isoformat()
+            }, indent=2)
+        }
+        
     except Exception as e:
-        logger.error(f"Failed to get pending secret: {e}")
-        raise
-    
-    # Try to update database if psycopg2 is available
-    if HAS_DB:
-        try:
-            # Get current secret (old credentials)
-            current = secretsmanager.get_secret_value(
-                SecretId=secret_id,
-                VersionStage='AWSCURRENT'
-            )
-            current_secret = json.loads(current['SecretString'])
-            
-            # Connect to database using OLD credentials to set NEW password
-            conn = psycopg2.connect(
-                host=os.environ.get('DB_HOST', 'auth-db.patient-service.svc.cluster.local'),
-                port=os.environ.get('DB_PORT', '5432'),
-                user=current_secret.get('username', 'authuser'),
-                password=current_secret.get('POSTGRES_PASSWORD', current_secret.get('password')),
-                database=current_secret.get('database', 'authdb'),
-                connect_timeout=5
-            )
-            conn.autocommit = True
-            cursor = conn.cursor()
-            
-            # Update user password
-            new_password = secret.get('POSTGRES_PASSWORD', secret.get('password'))
-            cursor.execute(
-                f"ALTER USER {secret.get('username', 'authuser')} PASSWORD '{new_password}';"
-            )
-            logger.info(f"✅ Updated database password for user {secret.get('username', 'authuser')}")
-            
-            cursor.close()
-            conn.close()
-            
-        except Exception as e:
-            logger.error(f"Database update failed: {e}")
-            logger.info("Continuing with rotation - database may be updated manually")
-            # Don't fail - continue rotation for POC
-    else:
-        # Demo mode - just log success
-        logger.info(f"✅ DEMO MODE: Would update database with new password for {secret.get('username', 'unknown')}")
+        logger.error(f"Lambda execution failed: {str(e)}", exc_info=True)
+        send_error_notification(str(e), event)
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
 
-def test_secret(secret_id, token):
-    """Test the new secret"""
-    # Get pending secret
+def get_recently_accessed_secrets(minutes: int = 15) -> List[str]:
+    """
+    Query CloudTrail for secrets accessed in last X minutes
+    """
     try:
-        pending = secretsmanager.get_secret_value(
-            SecretId=secret_id,
-            VersionId=token,
-            VersionStage='AWSPENDING'
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(minutes=minutes)
+        
+        response = cloudtrail.lookup_events(
+            LookupAttributes=[
+                {
+                    'AttributeKey': 'EventName',
+                    'AttributeValue': 'GetSecretValue'
+                }
+            ],
+            StartTime=start_time,
+            EndTime=end_time,
+            MaxResults=100
         )
-        secret = json.loads(pending['SecretString'])
+        
+        secret_arns = set()
+        for event in response.get('Events', []):
+            for resource in event.get('Resources', []):
+                if resource.get('ResourceType') == 'AWS::SecretsManager::Secret':
+                    secret_arns.add(resource.get('ResourceName'))
+        
+        return list(secret_arns)
+        
     except Exception as e:
-        logger.error(f"Failed to get pending secret: {e}")
-        raise
+        logger.error(f"Error querying CloudTrail: {str(e)}")
+        return []
+
+def revoke_secret(secret_arn: str, alarm_name: str) -> Dict[str, Any]:
+    """
+    Revoke a compromised secret by forcing immediate rotation
+    """
+    result = {
+        'secret_arn': secret_arn,
+        'success': False,
+        'action': None,
+        'error': None
+    }
     
-    # Test database connection if psycopg2 is available
-    if HAS_DB:
-        try:
-            conn = psycopg2.connect(
-                host=os.environ.get('DB_HOST', 'auth-db.patient-service.svc.cluster.local'),
-                port=os.environ.get('DB_PORT', '5432'),
-                user=secret.get('username', 'authuser'),
-                password=secret.get('POSTGRES_PASSWORD', secret.get('password')),
-                database=secret.get('database', 'authdb'),
-                connect_timeout=5
+    try:
+        secret_name = secret_arn.split(':')[-1].replace('secret:', '')
+        logger.info(f"Attempting to revoke secret: {secret_name}")
+        
+        # Skip JWT secrets
+        if 'jwt-secret' in secret_name:
+            logger.info(f"⏭️ Skipping JWT secret: {secret_name}")
+            result['success'] = True
+            result['action'] = 'skipped_jwt'
+            return result
+        
+        # Get current secret metadata
+        secret_info = secretsmanager.describe_secret(SecretId=secret_name)
+        rotation_enabled = secret_info.get('RotationEnabled', False)
+        
+        if rotation_enabled:
+            # Trigger rotation using existing configuration
+            logger.info(f"Secret {secret_name} has rotation enabled, triggering rotation")
+            secretsmanager.rotate_secret(SecretId=secret_name)
+            result['action'] = 'rotated'
+            logger.info(f"✅ Triggered rotation for secret: {secret_name}")
+        else:
+            # Enable rotation with immediate effect
+            logger.info(f"Secret {secret_name} has no rotation, enabling rotation")
+            secretsmanager.rotate_secret(
+                SecretId=secret_name,
+                RotationRules={'AutomaticallyAfterDays': 1}
             )
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            cursor.close()
-            conn.close()
-            logger.info("✅ Database connection test successful")
-            
-        except Exception as e:
-            logger.error(f"Database test failed: {e}")
-            logger.info("Continuing with rotation - may need manual verification")
-            # Don't fail - continue rotation for POC
-    else:
-        # Demo mode - just log success
-        logger.info(f"✅ DEMO MODE: Database connection test would succeed for user {secret.get('username', 'unknown')}")
-
-def finish_secret(secret_id, token):
-    """Mark the new secret as current"""
-    metadata = secretsmanager.describe_secret(SecretId=secret_id)
+            result['action'] = 'enabled_and_rotated'
+            logger.info(f"✅ Enabled rotation for secret: {secret_name}")
+        
+        result['success'] = True
+        
+        # Send individual alert for this secret
+        sns.publish(
+            TopicArn=os.environ['SNS_TOPIC_ARN'],
+            Subject=f"SECURITY: Secret Auto-Revoked - {alarm_name}",
+            Message=json.dumps({
+                'alarm': alarm_name,
+                'secret': secret_name,
+                'action': result['action'],
+                'timestamp': datetime.utcnow().isoformat()
+            }, indent=2)
+        )
+        
+    except Exception as e:
+        error_msg = f"Failed to revoke {secret_arn}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        result['error'] = str(e)
     
-    current_version = None
-    for version_id, stages in metadata['VersionIdsToStages'].items():
-        if 'AWSCURRENT' in stages:
-            current_version = version_id
-            break
-    
-    secretsmanager.update_secret_version_stage(
-        SecretId=secret_id,
-        VersionStage='AWSCURRENT',
-        MoveToVersionId=token,
-        RemoveFromVersionId=current_version
-    )
-    logger.info(f"✅ Rotation complete! New version {token} is now AWSCURRENT")
+    return result
 
-def generate_password(length=20):
-    """Generate random password"""
-    chars = string.ascii_letters + string.digits + "!@#$%^&*"
-    return ''.join(random.choice(chars) for _ in range(length))
+def send_summary_notification(alarm_name: str, alarm_reason: str, 
+                             revoked: List[Dict], failed: List[Dict]) -> None:
+    """
+    Send summary notification of revocation actions
+    """
+    try:
+        message = {
+            'alarm': alarm_name,
+            'alarm_reason': alarm_reason,
+            'timestamp': datetime.utcnow().isoformat(),
+            'summary': {
+                'total_revoked': len(revoked),
+                'total_failed': len(failed)
+            },
+            'revoked_secrets': revoked,
+            'failed_secrets': failed
+        }
+        
+        sns.publish(
+            TopicArn=os.environ['SNS_TOPIC_ARN'],
+            Subject=f"Auto-Revocation Summary - {alarm_name}",
+            Message=json.dumps(message, indent=2)
+        )
+        logger.info("Summary notification sent")
+        
+    except Exception as e:
+        logger.error(f"Failed to send summary: {str(e)}")
+
+def send_error_notification(error: str, event: Dict) -> None:
+    """
+    Send error notification when Lambda fails
+    """
+    try:
+        message = {
+            'error': error,
+            'timestamp': datetime.utcnow().isoformat(),
+            'severity': 'HIGH'
+        }
+        
+        sns.publish(
+            TopicArn=os.environ['SNS_TOPIC_ARN'],
+            Subject="Auto-Revocation Lambda Failed",
+            Message=json.dumps(message, indent=2)
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to send error notification: {str(e)}")
