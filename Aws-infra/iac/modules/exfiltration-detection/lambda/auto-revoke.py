@@ -1,4 +1,3 @@
-# auto-revoke.py - CORRECTED VERSION
 """
 Auto-Revocation Lambda for Secret Exfiltration Detection
 Triggered by CloudWatch Alarm via SNS
@@ -23,24 +22,25 @@ cloudtrail = boto3.client('cloudtrail')
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Main handler for auto-revocation Lambda
+    Triggered when CloudWatch alarm detects exfiltration
     """
     logger.info(f"Received event: {json.dumps(event)}")
     
     try:
         # Parse SNS message from CloudWatch alarm
-        # The event is from SNS, not directly from Secrets Manager!
         sns_message = json.loads(event['Records'][0]['Sns']['Message'])
         alarm_name = sns_message.get('AlarmName', 'unknown')
         alarm_reason = sns_message.get('NewStateReason', 'unknown')
         
-        logger.info(f"Alarm triggered: {alarm_name}")
-        logger.info(f"Reason: {alarm_reason}")
+        logger.info(f"🚨 EXFILTRATION DETECTED!")
+        logger.info(f"   Alarm: {alarm_name}")
+        logger.info(f"   Reason: {alarm_reason}")
         
         # Get secrets accessed in last 15 minutes
         affected_secrets = get_recently_accessed_secrets(minutes=15)
         
         if not affected_secrets:
-            logger.info("No secrets accessed in last 15 minutes")
+            logger.info("No secrets accessed recently")
             return {
                 'statusCode': 200,
                 'body': json.dumps({'message': 'No secrets to revoke'})
@@ -129,9 +129,9 @@ def revoke_secret(secret_arn: str, alarm_name: str) -> Dict[str, Any]:
         secret_name = secret_arn.split(':')[-1].replace('secret:', '')
         logger.info(f"Attempting to revoke secret: {secret_name}")
         
-        # Skip JWT secrets
+        # Skip JWT secrets (should not auto-rotate)
         if 'jwt-secret' in secret_name:
-            logger.info(f"⏭️ Skipping JWT secret: {secret_name}")
+            logger.info(f"⏭️ Skipping JWT secret (manual rotation only): {secret_name}")
             result['success'] = True
             result['action'] = 'skipped_jwt'
             return result
@@ -141,32 +141,33 @@ def revoke_secret(secret_arn: str, alarm_name: str) -> Dict[str, Any]:
         rotation_enabled = secret_info.get('RotationEnabled', False)
         
         if rotation_enabled:
-            # Trigger rotation using existing configuration
-            logger.info(f"Secret {secret_name} has rotation enabled, triggering rotation")
+            # Trigger immediate rotation using existing configuration
+            logger.info(f"🔄 Secret {secret_name} has rotation enabled - triggering emergency rotation")
             secretsmanager.rotate_secret(SecretId=secret_name)
-            result['action'] = 'rotated'
-            logger.info(f"✅ Triggered rotation for secret: {secret_name}")
+            result['action'] = 'emergency_rotation_triggered'
+            logger.info(f"✅ Emergency rotation triggered for secret: {secret_name}")
         else:
             # Enable rotation with immediate effect
-            logger.info(f"Secret {secret_name} has no rotation, enabling rotation")
+            logger.info(f"⚠️ Secret {secret_name} has no rotation - enabling with emergency schedule")
             secretsmanager.rotate_secret(
                 SecretId=secret_name,
                 RotationRules={'AutomaticallyAfterDays': 1}
             )
             result['action'] = 'enabled_and_rotated'
-            logger.info(f"✅ Enabled rotation for secret: {secret_name}")
+            logger.info(f"✅ Enabled emergency rotation for secret: {secret_name}")
         
         result['success'] = True
         
-        # Send individual alert for this secret
+        # Send individual alert
         sns.publish(
             TopicArn=os.environ['SNS_TOPIC_ARN'],
-            Subject=f"SECURITY: Secret Auto-Revoked - {alarm_name}",
+            Subject=f"🔐 SECURITY: Secret Auto-Revoked - {alarm_name}",
             Message=json.dumps({
                 'alarm': alarm_name,
                 'secret': secret_name,
                 'action': result['action'],
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.utcnow().isoformat(),
+                'message': f"Secret {secret_name} has been automatically revoked due to exfiltration detection"
             }, indent=2)
         )
         
@@ -197,7 +198,7 @@ def send_summary_notification(alarm_name: str, alarm_reason: str,
         
         sns.publish(
             TopicArn=os.environ['SNS_TOPIC_ARN'],
-            Subject=f"Auto-Revocation Summary - {alarm_name}",
+            Subject=f"📊 Auto-Revocation Summary - {alarm_name}",
             Message=json.dumps(message, indent=2)
         )
         logger.info("Summary notification sent")
@@ -218,7 +219,7 @@ def send_error_notification(error: str, event: Dict) -> None:
         
         sns.publish(
             TopicArn=os.environ['SNS_TOPIC_ARN'],
-            Subject="Auto-Revocation Lambda Failed",
+            Subject="❌ Auto-Revocation Lambda Failed",
             Message=json.dumps(message, indent=2)
         )
         
