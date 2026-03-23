@@ -14,7 +14,7 @@ node_groups = {
     max_size       = 3
     instance_types = ["t2.medium"]
     ami_type       = "AL2023_x86_64_STANDARD"
-    disk_size      = 5
+    disk_size      = 20
     capacity_type  = "ON_DEMAND"
 
     labels = {
