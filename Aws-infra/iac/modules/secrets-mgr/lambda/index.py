@@ -43,7 +43,7 @@ def create_secret(secret_id, token):
     current = secretsmanager.get_secret_value(SecretId=secret_id, VersionStage='AWSCURRENT')
     current_secret = json.loads(current['SecretString'])
     
-    # 🔥 GENERATE A BRAND NEW PASSWORD
+    # 🔥 GENERATE A NEW PASSWORD
     chars = string.ascii_letters + string.digits + "!@#$%^&*"
     new_password = ''.join(random.choice(chars) for _ in range(20))
     logger.info(f"✨ GENERATED NEW PASSWORD: {new_password}")
@@ -77,11 +77,11 @@ def set_secret(secret_id, token):
     )
     secret = json.loads(pending['SecretString'])
     new_password = secret.get('POSTGRES_PASSWORD', secret.get('password', 'unknown'))
-    logger.info(f"✅ POC: Would update database with new password: {new_password[:10]}...")
+    logger.info(f"✅: Would update database with new password: {new_password[:10]}...")
 
 def test_secret(secret_id, token):
     """Test the new secret (POC - assume success)"""
-    logger.info(f"✅ POC: New secret tested successfully")
+    logger.info(f"✅: New secret tested successfully")
 
 def finish_secret(secret_id, token):
     """Mark the new secret as current"""

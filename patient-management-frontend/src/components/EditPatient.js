@@ -33,7 +33,7 @@ function EditPatient() {
       setError('');
       
       console.log(`📥 Fetching patient with ID: ${id}`);
-      const response = await api.get(`/patient/${id}`);
+      const response = await api.get(`/api/patients/${id}`);
       
       console.log('✅ Patient data received:', response.data);
       

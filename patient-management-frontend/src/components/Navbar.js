@@ -19,7 +19,6 @@ function Navbar({ isAuthenticated }) {
       <div className="nav-container">
         <Link to="/patients" className="nav-brand">Patient Management</Link>
         <div className="nav-links">
-          <Link to="/patients" className="nav-link">Patients</Link>
           <Link to="/patients/add" className="nav-link">Add Patient</Link>
           <button onClick={handleLogout} className="nav-link logout-btn">Logout</button>
         </div>

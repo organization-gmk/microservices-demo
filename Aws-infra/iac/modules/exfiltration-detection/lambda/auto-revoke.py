@@ -162,7 +162,7 @@ def revoke_secret(secret_arn: str, alarm_name: str) -> Dict[str, Any]:
         # Send individual alert
         sns.publish(
             TopicArn=os.environ['SNS_TOPIC_ARN'],
-            Subject=f"🔐 SECURITY: Secret Auto-Revoked - {alarm_name}",
+            Subject=f"🔐 SECURITY: [{secret_name}] Auto-Revoked | Alarm: {alarm_name}",
             Message=json.dumps({
                 'alarm': alarm_name,
                 'secret': secret_name,
