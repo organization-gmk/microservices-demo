@@ -23,6 +23,7 @@ resource "aws_lambda_function" "auto_revoke" {
       LOG_LEVEL          = "INFO"
       ROTATION_DAYS      = "1"
       DRY_RUN_MODE       = "false"
+      ROTATION_LAMBDA_ARN = var.rotation_lambda_arn
     }
   }
 

@@ -62,6 +62,9 @@ module "exfiltration" {
   security_alert_email = var.security_alert_email
   cloudtrail_cloudwatch_role_arn = module.iam.iam_cw_cloudtrail_arn
   auto_revoke_lambda_arn         = module.iam.iam_lambda_auto_revoke_arn
+  rotation_lambda_arn            = module.secrets.rotation_lambda_arn
+
+
   tags        = local.common_tags 
   
 }

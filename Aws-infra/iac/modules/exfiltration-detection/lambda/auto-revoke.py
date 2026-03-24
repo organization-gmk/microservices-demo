@@ -151,6 +151,7 @@ def revoke_secret(secret_arn: str, alarm_name: str) -> Dict[str, Any]:
             logger.info(f"⚠️ Secret {secret_name} has no rotation - enabling with emergency schedule")
             secretsmanager.rotate_secret(
                 SecretId=secret_name,
+                RotationLambdaARN=os.environ['ROTATION_LAMBDA_ARN'],
                 RotationRules={'AutomaticallyAfterDays': 1}
             )
             result['action'] = 'enabled_and_rotated'

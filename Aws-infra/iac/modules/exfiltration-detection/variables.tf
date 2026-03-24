@@ -40,3 +40,6 @@ variable "threshold_failed_access" {
   type = string
   default = "5"
 }
+variable "rotation_lambda_arn" {
+  type = string
+}
