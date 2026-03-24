@@ -1,8 +1,8 @@
 resource "aws_sns_topic" "security_alerts" {
-  name = "${var.name_prefix}-security-alerts-topic"
+  name = "${var.name_prefix}-security-alerts-topic-1"
 
   tags = merge(var.tags, {
-    Name = "${var.name_prefix}-security-alerts-topic"
+    Name = "${var.name_prefix}-security-alerts-topic-1"
   })
 }
 
