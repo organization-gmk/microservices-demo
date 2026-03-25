@@ -98,3 +98,7 @@ variable "api_gateway_role_arn" {
   type = string
   
 }
+
+variable "cluster_autoscaler_arn" {
+  
+}

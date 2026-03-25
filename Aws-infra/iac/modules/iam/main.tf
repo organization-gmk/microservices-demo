@@ -134,7 +134,53 @@ resource "aws_iam_role_policy_attachment" "eks_ecr_access_policy_attachment" {
 #     ]
 #   })
 # }
+##########################CLUSTER-AUTOSCALR###########################################################
+resource "aws_iam_role" "cluster_autoscaler" {
+  name = "${var.name_prefix}-cluster-autoscaler"
 
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = data.aws_iam_openid_connect_provider.cluster.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_eks_cluster.gmk_cluster.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:cluster-autoscaler"
+          }
+        }
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy" "cluster_autoscaler" {
+  name = "${var.name_prefix}-cluster-autoscaler-policy"
+  role = aws_iam_role.cluster_autoscaler.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "autoscaling:DescribeAutoScalingGroups",
+          "autoscaling:DescribeAutoScalingInstances",
+          "autoscaling:DescribeLaunchConfigurations",
+          "autoscaling:DescribeScalingActivities",
+          "autoscaling:DescribeTags",
+          "autoscaling:SetDesiredCapacity",
+          "autoscaling:TerminateInstanceInAutoScalingGroup",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeLaunchTemplateVersions"
+        ]
+        Resource = ["*"]
+      }
+    ]
+  })
+}
 
 ########################EBS-CSI-DRIVER-POLICY#####################################################
 data "aws_iam_policy_document" "ebs_csi_assume_role" {

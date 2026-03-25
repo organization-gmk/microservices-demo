@@ -64,3 +64,8 @@ output "iam_lambda_auto_revoke_arn" {
   description = "ARN of the Lambda role for auto-revoke"
   value = aws_iam_role.auto_revoke_lambda.arn
 }
+
+output "iam_cluster_autoscaler_arn" {
+  description = "ARN of the IAM role for Cluster Autoscaler"
+  value = aws_iam_role.cluster_autoscaler.arn
+}

@@ -40,6 +40,8 @@ resource "aws_eks_node_group" "gmk_node_group" {
     var.tags,
     {
       Name = "${each.value.name}-node-group"
+      "k8s.io/cluster-autoscaler/enabled" = "true"
+      "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
     }
   )
 
@@ -140,7 +142,17 @@ resource "kubernetes_namespace_v1" "app_namespace" {
   }
 }
 
+#--------------Cluster Autoscaler----------------
+resource "kubernetes_service_account_v1" "cluster_autoscaler" {
+  metadata {
+    name      = "cluster-autoscaler"
+    namespace = "kube-system"
 
+    annotations = {
+      "eks.amazonaws.com/role-arn" = var.cluster_autoscaler_arn
+    }
+  }
+}
 
 # ------------- Auth Service Account -------------
 resource "kubernetes_service_account_v1" "auth_service" {

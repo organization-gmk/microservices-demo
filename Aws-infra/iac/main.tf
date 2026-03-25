@@ -39,6 +39,7 @@ module "eks" {
   auth_service_role_arn = module.iam.auth_service_role_arn
   patient_service_role_arn = module.iam.patient_service_role_arn
   api_gateway_role_arn = module.iam.api_gateway_role_arn
+  cluster_autoscaler_arn = module.iam.iam_cluster_autoscaler_arn
   
   tags                  = local.common_tags
 
