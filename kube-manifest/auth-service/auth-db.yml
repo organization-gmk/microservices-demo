@@ -14,7 +14,7 @@ spec:
       labels:
         app: auth-db
     spec:
-      serviceAccountName: auth-service-sa  # IMPORTANT: Add this!
+      serviceAccountName: auth-service-sa
       containers:
       - name: postgres
         image: postgres:15
@@ -40,11 +40,46 @@ spec:
         - name: data
           mountPath: /var/lib/postgresql/data
           subPath: postgres
-        - name: secrets-store  # ADD THIS
+        - name: secrets-store
           mountPath: /mnt/secrets
           readOnly: true
+      
+      # ✅ NEW SIDECAR: Syncs password to the database
+      - name: password-sync
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Starting password sync sidecar...";
+          while true; do
+            CURRENT_PASSWORD=$(cat /mnt/secrets/POSTGRES_PASSWORD 2>/dev/null);
+            if [ -n "$CURRENT_PASSWORD" ] && [ "$CURRENT_PASSWORD" != "$POSTGRES_PASSWORD" ]; then
+              echo "Secret change detected. Updating database password...";
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U $POSTGRES_USER -d postgres -c "ALTER USER $POSTGRES_USER WITH PASSWORD '$CURRENT_PASSWORD';";
+              export POSTGRES_PASSWORD="$CURRENT_PASSWORD";
+              echo "Database password updated successfully at $(date)";
+            fi
+            sleep 30;
+          done
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: secrets-store
+          mountPath: /mnt/secrets
+          readOnly: true
+      
       volumes:
-      - name: secrets-store  # ADD THIS
+      - name: secrets-store
         csi:
           driver: secrets-store.csi.k8s.io
           readOnly: true
@@ -59,3 +94,17 @@ spec:
       resources:
         requests:
           storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-db
+  namespace: patient-service
+spec:
+  type: ClusterIP
+  selector:
+    app: auth-db
+  ports:
+  - port: 5432
+    targetPort: 5432

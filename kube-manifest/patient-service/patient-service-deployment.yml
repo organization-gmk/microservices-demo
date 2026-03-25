@@ -14,6 +14,8 @@ spec:
     metadata:
       labels:
         app: patient-service
+      annotations:
+        secrets-store.csi.k8s.io/rotation-poll-interval: "30s"
     spec:
       serviceAccountName: patient-service-sa
       containers:
@@ -25,17 +27,17 @@ spec:
           name: http
         env:
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:postgresql://patient-service-db:5432/patient_db"
+          value: "jdbc:postgresql://patient-service-db:5432/db"
         - name: SPRING_DATASOURCE_USERNAME
           valueFrom:
             secretKeyRef:
               name: patient-service-secrets
-              key: POSTGRES_USER
+              key: DB_USERNAME
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
               name: patient-service-secrets
-              key: POSTGRES_PASSWORD
+              key: DB_PASSWORD
         - name: AWS_REGION
           value: "us-east-2"
         - name: SERVER_PORT
@@ -48,10 +50,10 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "384Mi"    # Reduced from 512Mi
-            cpu: "200m"        # Reduced from 250m
+            memory: "384Mi"   
+            cpu: "200m"        
           limits:
-            memory: "768Mi"    # Reduced from 1Gi
+            memory: "768Mi"   
             cpu: "400m" 
       volumes:
       - name: secrets-store

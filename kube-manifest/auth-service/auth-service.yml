@@ -4,7 +4,7 @@ metadata:
   name: auth-service
   namespace: patient-service
 spec:
-  replicas: 2  # Keep 2 for HA
+  replicas: 2
   selector:
     matchLabels:
       app: auth-service
@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: auth-service
+      annotations:
+        secrets-store.csi.k8s.io/rotation-poll-interval: "30s"
     spec:
       serviceAccountName: auth-service-sa
       containers:
@@ -64,11 +66,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "384Mi"    # Reduced from 512Mi
-            cpu: "200m"        # Reduced from 250m
+            memory: "384Mi"
+            cpu: "200m"
           limits:
-            memory: "768Mi"    # Reduced from 1Gi
-            cpu: "400m"        # Reduced from 500m
+            memory: "768Mi"
+            cpu: "400m"
         livenessProbe:
           httpGet:
             path: /actuator/health

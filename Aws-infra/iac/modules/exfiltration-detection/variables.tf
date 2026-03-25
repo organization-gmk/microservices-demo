@@ -32,7 +32,7 @@ variable "auto_revoke_lambda_arn" {
 variable "threshold_rapid_retrieval" {
     description = "Secrets threshold for alaram"
   type = string
-  default = "3"
+  default = "10"
 }
 
 variable "threshold_failed_access" {

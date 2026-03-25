@@ -26,17 +26,17 @@ spec:
           valueFrom:
             secretKeyRef:
               name: patient-service-secrets
-              key: POSTGRES_DB
+              key: DB_NAME  
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
               name: patient-service-secrets
-              key: POSTGRES_USER
+              key: DB_USERNAME  
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: patient-service-secrets
-              key: POSTGRES_PASSWORD
+              key: DB_PASSWORD  
         volumeMounts:
         - name: pgdata
           mountPath: /var/lib/postgresql/data
