@@ -140,6 +140,10 @@ resource "kubernetes_namespace_v1" "app_namespace" {
   metadata {
     name = "patient-service"
   }
+  
+  depends_on = [
+    aws_eks_node_group.gmk_node_group
+  ]
 }
 
 #--------------Cluster Autoscaler----------------

@@ -49,9 +49,10 @@ module "eks" {
 module "secrets" {
   source = "./modules/secrets-mgr"
 
-   name_prefix = local.name_prefix
-   aws_region = var.aws_region
-   tags                  = local.common_tags
+   name_prefix    = local.name_prefix
+   aws_region     = var.aws_region
+   aws_account_id = data.aws_caller_identity.current.account_id
+   tags           = local.common_tags
 
 }
 

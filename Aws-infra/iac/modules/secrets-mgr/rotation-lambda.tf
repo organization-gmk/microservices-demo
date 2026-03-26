@@ -97,11 +97,12 @@ locals {
 resource "aws_lambda_permission" "secrets_manager" {
   for_each = local.rotation_secrets_map
   
-  statement_id  = "AllowSecretsManagerInvocation-${each.key}"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.secret_rotation.function_name
-  principal     = "secretsmanager.amazonaws.com"
-  source_arn    = each.value.arn
+  statement_id   = "AllowSecretsManagerInvocation-${each.key}"
+  action         = "lambda:InvokeFunction"
+  function_name  = aws_lambda_function.secret_rotation.function_name
+  principal      = "secretsmanager.amazonaws.com"
+  source_arn     = each.value.arn
+  source_account = var.aws_account_id
 }
 
 # Archive file for Lambda code

@@ -12,7 +12,7 @@ spec:
     metadata:
       labels:
         app: auth-service
-      annotations:
+      annotations:  # ← Move annotations here, under metadata
         secrets-store.csi.k8s.io/rotation-poll-interval: "30s"
     spec:
       serviceAccountName: auth-service-sa
@@ -66,23 +66,27 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "384Mi"
-            cpu: "200m"
+            memory: "512Mi"
+            cpu: "250m"
           limits:
-            memory: "768Mi"
-            cpu: "400m"
-        livenessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 4005
-          initialDelaySeconds: 60
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 4005
-          initialDelaySeconds: 60
-          periodSeconds: 5
+            memory: "1Gi"
+            cpu: "500m"
+        # livenessProbe:
+        #   httpGet:
+        #     path: /actuator/health
+        #     port: 4005
+        #   initialDelaySeconds: 180
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 5
+        # readinessProbe:
+        #   httpGet:
+        #     path: /actuator/health
+        #     port: 4005
+        #   initialDelaySeconds: 180
+        #   periodSeconds: 5
+        #   timeoutSeconds: 5
+        #   failureThreshold: 5
       volumes:
       - name: secrets-store
         csi:

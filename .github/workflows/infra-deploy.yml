@@ -65,6 +65,14 @@ jobs:
           rm -rf .terraform
           terraform init -backend-config=${{ inputs.Terraform_Backend_Configuration_File }}
 
+      - name: Remove orphaned Kubernetes resources from state
+        if: steps.check_action.outputs.action == 'destroy'
+        run: |
+          # Remove the namespace resource from state since the cluster is gone
+          terraform state rm 'module.eks.kubernetes_namespace_v1.app_namespace' || true
+          # Remove all Kubernetes and Helm resources from state
+          terraform state list | grep -E '(kubernetes_|helm_)' | xargs -r terraform state rm || true
+
 
       - name: Terraform Validate
         run: terraform validate

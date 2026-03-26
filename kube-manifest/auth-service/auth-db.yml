@@ -44,23 +44,38 @@ spec:
           mountPath: /mnt/secrets
           readOnly: true
       
-      # ✅ NEW SIDECAR: Syncs password to the database
+      # Password Sync Sidecar - Automatically syncs secret to database
       - name: password-sync
         image: postgres:15
         command:
         - /bin/bash
         - -c
         - |
-          echo "Starting password sync sidecar...";
+          echo "🚀 Starting password sync sidecar..."
           while true; do
-            CURRENT_PASSWORD=$(cat /mnt/secrets/POSTGRES_PASSWORD 2>/dev/null);
-            if [ -n "$CURRENT_PASSWORD" ] && [ "$CURRENT_PASSWORD" != "$POSTGRES_PASSWORD" ]; then
-              echo "Secret change detected. Updating database password...";
-              PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U $POSTGRES_USER -d postgres -c "ALTER USER $POSTGRES_USER WITH PASSWORD '$CURRENT_PASSWORD';";
-              export POSTGRES_PASSWORD="$CURRENT_PASSWORD";
-              echo "Database password updated successfully at $(date)";
+            # Check if secret file exists
+            if [ -f /mnt/secrets/DB_PASSWORD ]; then
+              SECRET_PASSWORD=$(cat /mnt/secrets/DB_PASSWORD)
+              CURRENT_USER=$(cat /mnt/secrets/DB_USER)
+              
+              if [ -n "$SECRET_PASSWORD" ] && [ -n "$CURRENT_USER" ]; then
+                # Test if current password works
+                if PGPASSWORD="$SECRET_PASSWORD" psql -h localhost -U "$CURRENT_USER" -d postgres -c "SELECT 1" 2>/dev/null; then
+                  echo "✅ Password is correct at $(date)"
+                else
+                  echo "🔄 Password mismatch detected. Updating database..."
+                  # Use the old password from env to connect and update
+                  PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U "$CURRENT_USER" -d postgres -c "ALTER USER $CURRENT_USER WITH PASSWORD '$SECRET_PASSWORD';" 2>/dev/null
+                  echo "✅ Database password updated at $(date)"
+                fi
+              else
+                echo "⚠️ Secret files empty or not found"
+              fi
+            else
+              echo "⏳ Waiting for secret file /mnt/secrets/DB_PASSWORD..."
+              ls -la /mnt/secrets/ 2>/dev/null || echo "Directory not accessible"
             fi
-            sleep 30;
+            sleep 15
           done
         env:
         - name: POSTGRES_USER
@@ -85,6 +100,7 @@ spec:
           readOnly: true
           volumeAttributes:
             secretProviderClass: auth-service-secrets
+  
   volumeClaimTemplates:
   - metadata:
       name: data
