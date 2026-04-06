@@ -42,7 +42,9 @@ resource "aws_s3_bucket_public_access_block" "audit_logs" {
 
 # Bucket policy to allow CloudTrail write
 resource "aws_s3_bucket_policy" "audit_logs" {
-  bucket = aws_s3_bucket.audit_logs.id
+  bucket     = aws_s3_bucket.audit_logs.id
+  depends_on = [aws_s3_bucket_public_access_block.audit_logs]
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -54,6 +56,11 @@ resource "aws_s3_bucket_policy" "audit_logs" {
         }
         Action   = "s3:GetBucketAcl"
         Resource = aws_s3_bucket.audit_logs.arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceArn" = "arn:aws:cloudtrail:${var.aws_region}:${data.aws_caller_identity.current.account_id}:trail/${var.name_prefix}-secrets-audit-trail"
+          }
+        }
       },
       {
         Sid    = "AWSCloudTrailWrite"
@@ -66,6 +73,7 @@ resource "aws_s3_bucket_policy" "audit_logs" {
         Condition = {
           StringEquals = {
             "s3:x-amz-acl" = "bucket-owner-full-control"
+            "aws:SourceArn" = "arn:aws:cloudtrail:${var.aws_region}:${data.aws_caller_identity.current.account_id}:trail/${var.name_prefix}-secrets-audit-trail"
           }
         }
       }
