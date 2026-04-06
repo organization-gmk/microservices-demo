@@ -75,38 +75,38 @@ resource "aws_cloudwatch_metric_alarm" "rapid_retrieval" {
 }
 
 # Alarm #2: Unusual number of distinct secrets (ANOMALY DETECTION)
-resource "aws_cloudwatch_metric_alarm" "unusual_pattern" {
-  alarm_name          = "${var.name_prefix}-unusual-pattern-alarm"
-  comparison_operator = "LessThanLowerOrGreaterThanUpperThreshold"
-  evaluation_periods  = "2"
-  threshold_metric_id = "ad1"
-  alarm_description   = "ANOMALY DETECTED: Unusual pattern in secret access"
-  alarm_actions       = [aws_sns_topic.security_alerts.arn]
-  ok_actions          = [aws_sns_topic.security_alerts.arn]
-  insufficient_data_actions = []
+# resource "aws_cloudwatch_metric_alarm" "unusual_pattern" {
+#   alarm_name          = "${var.name_prefix}-unusual-pattern-alarm"
+#   comparison_operator = "LessThanLowerOrGreaterThanUpperThreshold"
+#   evaluation_periods  = "2"
+#   threshold_metric_id = "ad1"
+#   alarm_description   = "ANOMALY DETECTED: Unusual pattern in secret access"
+#   alarm_actions       = [aws_sns_topic.security_alerts.arn]
+#   ok_actions          = [aws_sns_topic.security_alerts.arn]
+#   insufficient_data_actions = []
 
-  # First metric query - the actual data
-  metric_query {
-    id          = "m1"
-    return_data = true
-    metric {
-      metric_name = "DistinctSecretsAccessed"
-      namespace   = "Security/SecretsManager"
-      period      = "300"
-      stat        = "Sum"
-    }
-  }
+#   # First metric query - the actual data
+#   metric_query {
+#     id          = "m1"
+#     return_data = true
+#     metric {
+#       metric_name = "DistinctSecretsAccessed"
+#       namespace   = "Security/SecretsManager"
+#       period      = "300"
+#       stat        = "Sum"
+#     }
+#   }
 
-  # Second metric query - anomaly detection band
-  metric_query {
-    id          = "ad1"
-    expression  = "ANOMALY_DETECTION_BAND(m1, 2)"
-    label       = "DistinctSecretsAccessed (expected range)"
-    return_data = true
-  }
+#   # Second metric query - anomaly detection band
+#   metric_query {
+#     id          = "ad1"
+#     expression  = "ANOMALY_DETECTION_BAND(m1, 2)"
+#     label       = "DistinctSecretsAccessed (expected range)"
+#     return_data = true
+#   }
 
-  tags = var.tags
-}
+#   tags = var.tags
+# }
 
 # Alarm #3: Failed access attempts (SIMPLE THRESHOLD)
 resource "aws_cloudwatch_metric_alarm" "failed_access_alarm" {
