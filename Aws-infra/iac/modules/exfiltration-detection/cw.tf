@@ -162,7 +162,7 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
         properties = {
           alarms = [
             aws_cloudwatch_metric_alarm.rapid_retrieval.arn,
-            aws_cloudwatch_metric_alarm.unusual_pattern.arn,
+            # aws_cloudwatch_metric_alarm.unusual_pattern.arn,
             aws_cloudwatch_metric_alarm.failed_access_alarm.arn
           ]
           title = "Security Alarms"
